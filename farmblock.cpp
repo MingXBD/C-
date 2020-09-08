@@ -17,6 +17,11 @@ void farmblock::setId(int nn)
         id=nn;
 }
 
+int farmblock::getId()
+{
+    return id;
+}
+
 void farmblock::grow()
 {
     pig* tp=head;
@@ -30,6 +35,36 @@ void farmblock::grow()
 bool farmblock::isfull()
 {
     return number>=maxsize;
+}
+
+pig *farmblock::getHead()
+{
+    return head;
+}
+
+int farmblock::getGrowRate()
+{
+    return grow_rate;
+}
+
+bool farmblock::isBlackOnly()
+{
+    return blackonly;
+}
+
+bool farmblock::isInfected()
+{
+    return infected;
+}
+
+int farmblock::getNumber()
+{
+    return number;
+}
+
+int farmblock::getSize()
+{
+    return maxsize;
 }
 
 pig *farmblock::setblackonly(bool nbo)
@@ -96,7 +131,7 @@ float farmblock::sell(float p[3],int time)
     pig* tp=head;
     while(tp!=nullptr)
     {
-        if(time-tp->getBuytime()>=365||tp->getWeight()>=75)
+        if(time-(tp->getBuytime())>=365||tp->getWeight()>=75)
         {
             tot+=tp->getWeight()*p[tp->getType()];
             number--;

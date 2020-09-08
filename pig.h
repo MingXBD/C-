@@ -21,6 +21,7 @@ public:
     int getBuytime();
     void grow(float);
     void beInfected();
+    int getId();
 
     void debugout();
 

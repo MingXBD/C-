@@ -18,15 +18,25 @@ public:
     bool operator <(farmblock);
     bool operator >(farmblock);
     void setId(int);
-    void grow();
-    bool isfull();
-    pig* setblackonly(bool);
-    bool pigin(pig*);
     void setProtect(int,int);
+    pig* setblackonly(bool);
+
+    int getId();
+    bool isfull();
+    pig* getHead();
+    int getGrowRate();
+    bool isBlackOnly();
+    bool isInfected();
+    int getNumber();
+    int getSize();
+
+    bool pigin(pig*);
+    void grow();
     void beInfected(int);
     void updateInf();
     float sell(float[3],int);
     void debugout();
+
     farmblock* next;
 
     farmblock();

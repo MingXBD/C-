@@ -30,6 +30,11 @@ void pig::beInfected()
     infected=1;
 }
 
+int pig::getId()
+{
+    return id;
+}
+
 void pig::debugout()
 {
     qDebug()<<"PigID: "<<id<<' '
@@ -49,7 +54,7 @@ pig::pig(bool isi, int time)
     infected=isi;
     buytime=time;
     next=nullptr;
-    debugout();
+    //debugout();
 }
 
 int pig::globalid=0;
