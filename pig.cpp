@@ -30,6 +30,15 @@ void pig::beInfected()
     infected=1;
 }
 
+bool pig::isDead()
+{
+    if(!infected)
+        return false;
+    if(qrand()%100<deadrate)
+        return true;
+    return false;
+}
+
 int pig::getId()
 {
     return id;
@@ -58,6 +67,7 @@ pig::pig(bool isi, int time)
 }
 
 int pig::globalid=0;
+int pig::deadrate=5;
 
 void debuglistout(pig *tp,int num)
 {

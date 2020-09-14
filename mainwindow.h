@@ -46,7 +46,7 @@ public:
     int page;
     int blockid[10];
     int detailid;
-
+    QString recordname;
 
     std::vector<farmblock*> heap;
     std::vector<farmblock*> bheap;
@@ -61,9 +61,9 @@ public:
     QPushButton* add_pig;
     QPushButton* pagenext;
     QPushButton* pagepre;
+    QPushButton* statisticbut;
 
     void timerEvent(QTimerEvent *);
-
 
     void balanced_insert(pig*&);
     void addpig();
@@ -72,14 +72,12 @@ public:
     void showfarmdetail(int);
     void mainmenu();
     void buildblocks();
-    void statistic();
-    void showData();
+    void changepage(bool);
+    void viewcreate();
 
-    int debugswitch;
     void debugout();
     QPushButton* testbut;
     QLabel* testlabel;
-    void (MainWindow::*tfun[3])(void);
 
     ~MainWindow();
 private:
@@ -87,24 +85,10 @@ private:
 public slots:
     void gamestart();
     void reqaddpig();
-    void changepage(bool);
     void changeTimeRate();
     void savefile();
     void pac();
-
-    void pageup();
-    void pagedown();
-
-    void farmselect0();
-    void farmselect1();
-    void farmselect2();
-    void farmselect3();
-    void farmselect4();
-    void farmselect5();
-    void farmselect6();
-    void farmselect7();
-    void farmselect8();
-    void farmselect9();
+    void statistic();
 
     void slottest();
 };

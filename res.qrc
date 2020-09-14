@@ -4,5 +4,10 @@
         <file>res/icon.png</file>
         <file>res/start.png</file>
         <file>res/wood.png</file>
+        <file>res/black.png</file>
+        <file>res/empty.png</file>
+        <file>res/infblack.png</file>
+        <file>res/infnormal.png</file>
+        <file>res/normal.png</file>
     </qresource>
 </RCC>

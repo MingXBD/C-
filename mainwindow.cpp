@@ -11,21 +11,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
     gamemode=0;
 
-    /*
-    testbut=new QPushButton;
-    testbut->setGeometry(200,200,50,50);
-    testbut->setStyleSheet("QPushButton{border-image: url(:/res/icon.png)}");
-    testbut->setParent(this);
-    testbut->show();
-
-    ui->label_test1->setText(QString::number(globaltime));
-    connect(ui->pushButton_test1,SIGNAL(pressed()),this,SLOT(changeTimeRate()));
-    connect(ui->pushButton_test2,SIGNAL(pressed()),this,SLOT(changeicon()));
-    */
-
     for(int i=0;i<100;i++)
     {
-        blockshow[i]=nullptr;
+        blockshow[i]=new QPushButton(this);
+        blockshow[i]->hide();
     }
     for(int i=0;i<10;i++)
     {
@@ -34,7 +23,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     isPause=0;
     detailid=-1;
-    debugswitch=0;
     Req_addpig=0;
     for(int i=0;i<100;i++)
     {
@@ -48,6 +36,7 @@ MainWindow::MainWindow(QWidget *parent) :
 void MainWindow::timerEvent(QTimerEvent *)
 {
     globaltime++;
+
     if(Req_addpig>0)
     {
         while(Req_addpig>0)
@@ -57,12 +46,28 @@ void MainWindow::timerEvent(QTimerEvent *)
         }
         add_pig->setText("Add pigs");
     }
+
     labeltime->setText("Time: "+QString::number(globaltime));
     labelmoney->setText("Money: "+QString::number(money));
     buildblocks();
     showfarmdetail(detailid);
+    bool ninf[100]={0};
     for(int i=0;i<100;i++)
     {
+        if(i-1>=0&&farms[i-1].isInfected()&&qrand()%100<15)
+        {
+            ninf[i]=1;
+        }
+        if(i+1<100&&farms[i+1].isInfected()&&qrand()%100<15)
+        {
+            ninf[i]=1;
+        }
+    }
+    for(int i=0;i<100;i++)
+    {
+        if(ninf[i])
+            farms[i].beInfected(globaltime);
+        farms[i].updateInf();
         farms[i].grow();
     }
     if(globaltime%90==0)
@@ -160,13 +165,6 @@ void MainWindow::showfarmdetail(int id)
 void MainWindow::balanced_insert(pig *&npig)
 {
     pig* leftpig=nullptr;
-    if(debugswitch)
-    {
-        qDebug()<<"balanced_insert: piglist:\n{";
-        debuglistout(npig,-1);
-        qDebug()<<"}";
-        debugswitch=0;
-    }
     while(npig!=nullptr)
     {
         pig* nexp=npig->next;
@@ -244,54 +242,51 @@ void MainWindow::buildblocks()
 {
     QPushButton* nbut;
     farmblock* nfarm;
-    if(debugswitch)
-        debugswitch=0;
     int blocknum=page==10?100:10;
     for(int i=0;i<100;i++)
     {
-        if(blockshow[i]!=nullptr)
-            blockshow[i]->hide();
+        blockshow[i]->hide();
     }
     for(int i=0;i<blocknum;i++)
     {
-        if(page==10)
-        {
-            if(blockshow[i]==nullptr)
-                blockshow[i]=new QPushButton(this);
-            nbut=blockshow[i];
-            nfarm=&farms[i];
-        }
-        else
-        {
-            if(blockshow[page*10+i]==nullptr)
-                blockshow[page*10+i]=new QPushButton(this);
-            nbut=blockshow[page*10+i];
-            nfarm=&farms[page*10+i];
-        }
         int px,py,pw,ph;
         if(page==10)
         {
-            pw=60;
+            nbut=blockshow[i];
+            nfarm=&farms[i];
+            pw=40;
             ph=50;
             px=i%10*(pw+10)+100;
             py=i/10*(ph+10)+140;
         }
         else
         {
-            pw=150;
-            ph=200;
+            nbut=blockshow[page*10+i];
+            nfarm=&farms[page*10+i];
+            pw=160;
+            ph=220;
             px=i%5*(pw+10)+10;
             py=i/5*(ph+10)+140;
         }
         nbut->setGeometry(px,py,pw,ph);
+
         QString tss="QPushButton{border-image: url(:/res/";
-        tss+=(nfarm->isBlackOnly()?"":"wood");
+        if(nfarm->getNumber()==0)
+        {
+            tss+="empty";
+        }
+        else
+        {
+            tss+=(nfarm->isInfected()?"inf":"");
+            tss+=(nfarm->isBlackOnly()?"black":"normal");
+        }
         tss+=".png);font:";
         tss+=QString::number(page==10?8:13);
         tss+="pt;";
         if(page!=10)
             tss+="font-weight:bold";
         tss+="}";
+
         nbut->setStyleSheet(tss);
         if(page!=10)
         {
@@ -309,6 +304,7 @@ void MainWindow::buildblocks()
                           +"Inf: "+(nfarm->isInfected()?"Inf":"Not")
                           );
         }
+
         nbut->show();
     }
 }
@@ -340,11 +336,6 @@ void MainWindow::statistic()
     detailid=-2;
 }
 
-void MainWindow::showData()
-{
-
-}
-
 void MainWindow::savefile()
 {
     QFile fsave("test.in");
@@ -353,7 +344,6 @@ void MainWindow::savefile()
         qDebug()<<"open fail";
         return;
     }
-
     QTextStream tout(&fsave);
     int a;
     tout>>a;
@@ -402,7 +392,60 @@ void MainWindow::gamestart()
     prices[2]=12;
     delete StartBut;
 
+    viewcreate();
 
+    timerate=1;
+    globaltimer=startTimer(1000);
+    infmon=999999999;
+
+    pig* piglist=buypig(infmon,qrand()%50-100+100*5);
+    balanced_insert(piglist);
+    qDebug()<<"insert end";
+    debuglistout(piglist,0);
+    //debugout();
+
+    page=0;
+    buildblocks();
+
+    for(int i=0;i<100;i++)
+    {
+        connect(blockshow[i],&QPushButton::pressed,[=](){showfarmdetail(i);});
+    }
+
+    qDebug()<<"init end";
+}
+
+void MainWindow::reqaddpig()
+{
+    Req_addpig++;
+    add_pig->setText("Add pigs ("+QString::number(Req_addpig)+")");
+}
+
+void MainWindow::slottest()
+{
+    pig* tp=new pig(1,globaltime);
+    balanced_insert(tp);
+}
+
+void MainWindow::changepage(bool dir)
+{
+    if(dir)
+        page++;
+    else
+        page--;
+    page=(page%11+11)%11;
+    if(page!=10)
+    {
+        for(int i=0;i<10;i++)
+        {
+            blockid[i]=page*10+i;
+        }
+    }
+    buildblocks();
+}
+
+void MainWindow::viewcreate()
+{
     labeltime=new QLabel(this);
     labeltime->setGeometry(40,30,200,100);
     labeltime->setAlignment(Qt::AlignCenter);
@@ -452,13 +495,13 @@ void MainWindow::gamestart()
     pagepre->setGeometry(680,60,pagebutsizew,pagebutsizeh);
     pagepre->setText("<- Page previous");
     pagepre->show();
-    connect(pagepre,SIGNAL(pressed()),this,SLOT(pagedown()));
+    connect(pagepre,&QPushButton::pressed,[=](){changepage(0);});
 
     pagenext=new QPushButton(this);
     pagenext->setGeometry(810,60,pagebutsizew,pagebutsizeh);
     pagenext->setText("Page next ->");
     pagenext->show();
-    connect(pagenext,SIGNAL(pressed()),this,SLOT(pageup()));
+    connect(pagenext,&QPushButton::pressed,this,[=](){changepage(1);});
 
     farmdetail=new QLabel(this);
     farmdetail->setGeometry(980,0,300,768);
@@ -482,151 +525,20 @@ void MainWindow::gamestart()
     testbut->setGeometry(0,0,50,50);
     testbut->setText("test");
     testbut->show();
-    /*tfun[0]=MainWindow::statistic;
-    QObject::connect(testbut,&QPushButton::pressed,[=](){(this->*tfun[0])();});*/
     connect(testbut,SIGNAL(pressed()),this,SLOT(slottest()));
 
-    timerate=1;
-    globaltimer=startTimer(1000);
-    infmon=999999999;
+    statisticbut=new QPushButton(this);
+    statisticbut->setGeometry(860,100,70,40);
+    statisticbut->setText("Statistic");
+    statisticbut->show();
+    connect(statisticbut,SIGNAL(pressed()),this,SLOT(statistic()));
 
-    debugswitch=0;
-
-    pig* piglist=buypig(infmon,qrand()%50-100+100*5);
-    balanced_insert(piglist);
-    qDebug()<<"insert end";
-    debuglistout(piglist,0);
-    //debugout();
-
-    page=0;
-    buildblocks();
-    connect(blockshow[page*10+0],SIGNAL(pressed()),this,SLOT(farmselect0()));
-    connect(blockshow[page*10+1],SIGNAL(pressed()),this,SLOT(farmselect1()));
-    connect(blockshow[page*10+2],SIGNAL(pressed()),this,SLOT(farmselect2()));
-    connect(blockshow[page*10+3],SIGNAL(pressed()),this,SLOT(farmselect3()));
-    connect(blockshow[page*10+4],SIGNAL(pressed()),this,SLOT(farmselect4()));
-    connect(blockshow[page*10+5],SIGNAL(pressed()),this,SLOT(farmselect5()));
-    connect(blockshow[page*10+6],SIGNAL(pressed()),this,SLOT(farmselect6()));
-    connect(blockshow[page*10+7],SIGNAL(pressed()),this,SLOT(farmselect7()));
-    connect(blockshow[page*10+8],SIGNAL(pressed()),this,SLOT(farmselect8()));
-    connect(blockshow[page*10+9],SIGNAL(pressed()),this,SLOT(farmselect9()));
-
-    qDebug()<<"init end";
-}
-
-void MainWindow::reqaddpig()
-{
-    Req_addpig++;
-    add_pig->setText("Add pigs ("+QString::number(Req_addpig)+")");
-}
-
-void MainWindow::pageup()
-{
-    changepage(1);
-}
-
-void MainWindow::pagedown()
-{
-    changepage(0);
-}
-
-void MainWindow::farmselect0()
-{
-    showfarmdetail(blockid[0]);
-}
-
-void MainWindow::farmselect1()
-{
-    showfarmdetail(blockid[1]);
-}
-
-void MainWindow::farmselect2()
-{
-    showfarmdetail(blockid[2]);
-}
-
-void MainWindow::farmselect3()
-{
-    showfarmdetail(blockid[3]);
-}
-
-void MainWindow::farmselect4()
-{
-    showfarmdetail(blockid[4]);
-}
-
-void MainWindow::farmselect5()
-{
-    showfarmdetail(blockid[5]);
-}
-
-void MainWindow::farmselect6()
-{
-    showfarmdetail(blockid[6]);
-}
-
-void MainWindow::farmselect7()
-{
-    showfarmdetail(blockid[7]);
-}
-
-void MainWindow::farmselect8()
-{
-    showfarmdetail(blockid[8]);
-}
-
-void MainWindow::farmselect9()
-{
-    showfarmdetail(blockid[9]);
-}
-
-void MainWindow::slottest()
-{
-    statistic();
-}
-
-void MainWindow::changepage(bool dir)
-{
-    if(page!=10)
-    {
-        for(int i=0;i<10;i++)
-        {
-            blockshow[page*10+i]->disconnect();
-        }
-    }
-    if(dir)
-        page++;
-    else
-        page--;
-    page=(page%11+11)%11;
-    if(page!=10)
-    {
-        for(int i=0;i<10;i++)
-        {
-            blockid[i]=page*10+i;
-        }
-    }
-    buildblocks();
-    if(page!=10)
-    {
-        connect(blockshow[page*10+0],SIGNAL(pressed()),this,SLOT(farmselect0()));
-        connect(blockshow[page*10+1],SIGNAL(pressed()),this,SLOT(farmselect1()));
-        connect(blockshow[page*10+2],SIGNAL(pressed()),this,SLOT(farmselect2()));
-        connect(blockshow[page*10+3],SIGNAL(pressed()),this,SLOT(farmselect3()));
-        connect(blockshow[page*10+4],SIGNAL(pressed()),this,SLOT(farmselect4()));
-        connect(blockshow[page*10+5],SIGNAL(pressed()),this,SLOT(farmselect5()));
-        connect(blockshow[page*10+6],SIGNAL(pressed()),this,SLOT(farmselect6()));
-        connect(blockshow[page*10+7],SIGNAL(pressed()),this,SLOT(farmselect7()));
-        connect(blockshow[page*10+8],SIGNAL(pressed()),this,SLOT(farmselect8()));
-        connect(blockshow[page*10+9],SIGNAL(pressed()),this,SLOT(farmselect9()));
-    }
 }
 
 void MainWindow::addpig()
 {
     pig* piglist=buypig(infmon,50);
     balanced_insert(piglist);
-    //debugout();
     if(piglist==nullptr)
     {
         qDebug()<<"no pig left";

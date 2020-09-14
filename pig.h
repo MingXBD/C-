@@ -13,6 +13,7 @@ private:
     float weight;
     bool infected;
     int buytime;
+    static int deadrate;
 public:
     bool stuck;
     int getType();
@@ -21,6 +22,7 @@ public:
     int getBuytime();
     void grow(float);
     void beInfected();
+    bool isDead();
     int getId();
 
     void debugout();

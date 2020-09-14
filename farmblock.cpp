@@ -101,7 +101,7 @@ void farmblock::setProtect(int len,int time)
 
 void farmblock::beInfected(int time)
 {
-    if(protectlen>=time)
+    if(protectlen>=time||number==0)
         return;
     int tn=qrand()%number;
     pig* tp=head;
@@ -116,12 +116,43 @@ void farmblock::updateInf()
     if(infected==0)
         return;
     pig* tp=head;
+    pig* pre=nullptr;
     while(tp!=nullptr)
     {
-        if(qrand()%100<50)
-            tp->beInfected();
-        tp=tp->next;
+        if(tp->isInfected())
+        {
+            if(tp->isDead())
+            {
+                number--;
+                if(tp==head)
+                {
+                    head=tp->next;
+                    delete tp;
+                    tp=head;
+                }
+                else
+                {
+                    pre->next=tp->next;
+                    delete tp;
+                    tp=pre->next;
+                }
+            }
+            else
+            {
+                pre=tp;
+                tp=tp->next;
+            }
+        }
+        else
+        {
+            if(qrand()%100<50)
+                tp->beInfected();
+            pre=tp;
+            tp=tp->next;
+        }
     }
+    if(number==0)
+        infected=0;
 }
 
 float farmblock::sell(float p[3],int time)
@@ -131,7 +162,7 @@ float farmblock::sell(float p[3],int time)
     pig* tp=head;
     while(tp!=nullptr)
     {
-        if(time-(tp->getBuytime())>=365||tp->getWeight()>=75)
+        if(!tp->isInfected()&&(time-(tp->getBuytime())>=365||tp->getWeight()>=75))
         {
             tot+=tp->getWeight()*p[tp->getType()];
             number--;
