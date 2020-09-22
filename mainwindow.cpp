@@ -8,28 +8,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
-    gamemode=0;
-
-    for(int i=0;i<100;i++)
-    {
-        blockshow[i]=new QPushButton(this);
-        blockshow[i]->hide();
-    }
-    for(int i=0;i<10;i++)
-    {
-        blockid[i]=i;
-    }
-
-    isPause=0;
-    detailid=-1;
-    Req_addpig=0;
-    for(int i=0;i<100;i++)
-    {
-        farms[i].setId(i);
-        heap.push_back(&farms[i]);
-    }
-    make_heap(heap.begin(),heap.end(),farmcmp);
     mainmenu();
 }
 
@@ -41,16 +19,12 @@ void MainWindow::timerEvent(QTimerEvent *)
     {
         while(Req_addpig>0)
         {
-            addpig();
+            addpig(infmon);
             Req_addpig--;
         }
         add_pig->setText("Add pigs");
     }
 
-    labeltime->setText("Time: "+QString::number(globaltime));
-    labelmoney->setText("Money: "+QString::number(money));
-    buildblocks();
-    showfarmdetail(detailid);
     bool ninf[100]={0};
     for(int i=0;i<100;i++)
     {
@@ -63,6 +37,7 @@ void MainWindow::timerEvent(QTimerEvent *)
             ninf[i]=1;
         }
     }
+
     for(int i=0;i<100;i++)
     {
         if(ninf[i])
@@ -70,15 +45,35 @@ void MainWindow::timerEvent(QTimerEvent *)
         farms[i].updateInf();
         farms[i].grow();
     }
+
+    make_heap(heap.begin(),heap.end(),farmcmp);
+    make_heap(bheap.begin(),bheap.end(),farmcmp);
+
     if(globaltime%90==0)
     {
         float tmon=0;
+        int sellnum=0;
         for(int i=0;i<100;i++)
         {
+            int temp=farms[i].getNumber();
             tmon+=farms[i].sell(prices,globaltime);
+            sellnum+=temp-farms[i].getNumber();
         }
         money+=tmon;
     }
+
+    if(globaltime%365==0)
+        bchange();
+
+    updatenum();
+
+    if(showstat)
+        statistic();
+    else
+        showfarmdetail(detailid);
+    labeltime->setText("Time: "+QString::number(globaltime));
+    labelmoney->setText("Money: "+QString::number(money));
+    buildblocks();
 }
 
 void MainWindow::mainmenu()
@@ -119,17 +114,38 @@ pig* MainWindow::buypig(int &mon,int num)
             break;
         }
     }
+    mon-=tmon;
+
+    f_buy<<totnum<<' '<<tmon<<' ';
+
     return thead;
+}
+
+void MainWindow::selectfarm(int id)
+{
+    switch(clicktype)
+    {
+    case 1:showfarmdetail(id);break;
+    }
 }
 
 void MainWindow::showfarmdetail(int id)
 {
     if(id==-1)
-        return;
-    if(id==-2)
     {
-        statistic();
+        farmdetail->setText("No Farm Selected");
         return;
+    }
+    for(int i=0;i<120;i++)
+    {
+        graphlabel[i]->hide();
+    }
+    if(showstat)
+    {
+        for(int i=0;i<120;i++)
+            graphlabel[i]->hide();
+        statisticbut->setText("Statistic");
+        showstat=0;
     }
     detailid=id;
     QString tstr="Farm :";
@@ -256,7 +272,7 @@ void MainWindow::buildblocks()
             nfarm=&farms[i];
             pw=40;
             ph=50;
-            px=i%10*(pw+10)+100;
+            px=i%10*(pw+20)+100;
             py=i/10*(ph+10)+140;
         }
         else
@@ -265,8 +281,8 @@ void MainWindow::buildblocks()
             nfarm=&farms[page*10+i];
             pw=160;
             ph=220;
-            px=i%5*(pw+10)+10;
-            py=i/5*(ph+10)+140;
+            px=i%5*(pw+10)+50;
+            py=i/5*(ph+10)+200;
         }
         nbut->setGeometry(px,py,pw,ph);
 
@@ -281,10 +297,10 @@ void MainWindow::buildblocks()
             tss+=(nfarm->isBlackOnly()?"black":"normal");
         }
         tss+=".png);font:";
-        tss+=QString::number(page==10?8:13);
+        tss+=QString::number(page==10?13:16);
         tss+="pt;";
-        if(page!=10)
-            tss+="font-weight:bold";
+        //if(page!=10)
+        tss+="font-weight:bold";
         tss+="}";
 
         nbut->setStyleSheet(tss);
@@ -292,16 +308,12 @@ void MainWindow::buildblocks()
         {
             nbut->setText("FarmId: "+QString::number(nfarm->getId())+"\n"
                           +"Number: "+QString::number(nfarm->getNumber())+"\n"
-                          +"BlackOnly: "+(nfarm->isBlackOnly()?"yes":"no")+"\n"
-                          +"GrowSpeed: "+QString::number(nfarm->getGrowRate())+"\n"
-                          +"Infected: "+(nfarm->isInfected()?"yes":"no")
+                          +"GrowSpeed: "+QString::number(nfarm->getGrowRate())
                           );
         }
         else
         {
-            nbut->setText("Num: "+QString::number(nfarm->getNumber())+"\n"
-                          +"Spd: "+QString::number(nfarm->getGrowRate())+"\n"
-                          +"Inf: "+(nfarm->isInfected()?"Inf":"Not")
+            nbut->setText(QString::number(nfarm->getNumber())
                           );
         }
 
@@ -311,53 +323,229 @@ void MainWindow::buildblocks()
 
 void MainWindow::statistic()
 {
-    int tpignum[2000]={0};
+    int pignum[2][27]={0};
+    int pigtime[13]={0};
+    int pigtype[2][3]={0};
+
+    int timeg=15;
+
     for(int i=0;i<100;i++)
     {
         pig* tp=farms[i].getHead();
         while(tp!=nullptr)
         {
-            tpignum[int((tp->getWeight())*10)]++;
+            int temp=(tp->getWeight())*10;
+            int isi=(tp->isInfected());
+
+            if(temp>=26*50)
+            {
+                pignum[isi][26]++;
+            }
+            else
+            {
+                int tt=temp/50;
+                pignum[isi][tt]++;
+            }
+            temp=globaltime-(tp->getBuytime());
+            if(temp>=12*timeg)
+            {
+                pigtime[12]++;
+            }
+            else
+            {
+                pigtime[temp/timeg]++;
+            }
+            pigtype[isi][tp->getType()]++;
+
             tp=tp->next;
         }
+
     }
-    QString tstr="Statistic:\n";
-    int tjg=50;
-    for(int i=0;i<2000;i+=tjg)
+
+    int maxnum=0;
+    for(int i=0;i<27;i++)
     {
-        int temp=0;
-        for(int j=0;j<tjg;j++)
-        {
-            temp+=tpignum[i+j];
-        }
-        tstr+=QString::number(float(i)/10)+" - "+QString::number(float(i+tjg)/10)+" : "+QString::number(temp)+"\n";
+        int temp=pignum[0][i]+pignum[1][i];
+        maxnum=maxnum>temp?maxnum:temp;
     }
-    farmdetail->setText(tstr);
-    detailid=-2;
+    float mw=250;
+    float ppx=mw/maxnum<mw/100?mw/maxnum:mw/100;
+    //ppx=1;
+
+    int wpx=1000,wpy=30,wph=10,wpg=5;
+
+    for(int i=4;i<27;i++)
+    {
+        int temp=pignum[1][i]*ppx;
+        graphlabel[3*i]->setGeometry(wpx,wpy+i*(wph+wpg),temp,wph);
+        graphlabel[3*i]->setStyleSheet("QLabel{"
+                                       "border-image: url(:/res/infbar.png)"
+                                       "}"
+                                       );
+        graphlabel[3*i]->setAlignment(Qt::AlignCenter);
+        graphlabel[3*i]->setText(QString::number(pignum[1][i]));
+        graphlabel[3*i]->show();
+
+        int ttemp=pignum[0][i]*ppx;
+        graphlabel[3*i+1]->setGeometry(wpx+temp+1,wpy+i*(wph+wpg),ttemp,wph);
+        graphlabel[3*i+1]->setStyleSheet("QLabel{"
+                                       "border-image: url(:/res/norbar.png)"
+                                         "}"
+                                       );
+        graphlabel[3*i+1]->setAlignment(Qt::AlignCenter);
+        graphlabel[3*i+1]->setText(QString::number(pignum[0][i]));
+        graphlabel[3*i+1]->show();
+
+        graphlabel[3*i+2]->setGeometry(wpx-25,wpy+i*(wph+wpg),30,wph);
+        graphlabel[3*i+2]->setText(QString::number(float(i*50)/10));
+        graphlabel[3*i+2]->show();
+    }
+
+    //80 used
+
+    int used=81;
+
+    mw=280;
+    updatenum();
+    ppx=mw/totpignum;
+    wpy=450,wph=20;
+    int last=970;
+    int bord=last+mw;
+    int part=6;
+
+    for(int i=0;i<=12;i++)
+    {
+        graphlabel[i+used]->setAlignment(Qt::AlignCenter);
+        std::string str="";
+        str+="QLabel{background-color: #";
+        std::stringstream ss;
+        ss<< std::uppercase << std::setfill('0') << std::setw(2) << std::hex <<int(196+float(255-196)*(i<=part?i:part)/part);
+        std::string tstr;
+        ss>>tstr;
+        //ss.str("");
+        ss.clear();
+        str+=tstr;
+        ss<< std::uppercase << std::setfill('0') << std::setw(2) << std::hex <<int(250+float(234-250)*(i<=part?i:part)/part);
+        ss>>tstr;
+        str+=tstr;
+        str+="FF}";
+        //qDebug()<<QString::fromStdString(str);
+        graphlabel[i+used]->setStyleSheet(QString::fromStdString(str));
+
+        int tx=ppx*pigtime[i];
+        if(i!=12)
+        {
+            graphlabel[i+used]->setGeometry(last,wpy,tx,wph);
+        }
+        else
+        {
+            if(isPause)
+            {
+                qDebug()<<"stop here";
+            }
+            graphlabel[i+used]->setGeometry(last,wpy,bord-last,wph);
+        }
+        if((i<10&&tx>=5)||(tx>=7))
+            graphlabel[i+used]->setText(QString::number(i));
+        else
+            graphlabel[i+used]->setText("test");
+
+        graphlabel[i+used]->show();
+        last+=tx;
+    }
+
+    //used 12
+
+    used+=13;
+    wpy=480,wph=30;
+    last=970;
+    bord=last+mw;
+
+    for(int i=0;i<3;i++)
+    {
+        graphlabel[i+used]->setAlignment(Qt::AlignCenter);
+        QString str="";
+        str+="QLabel{background-color: #";
+        switch(i)
+        {
+        case 0:str+="EFEF04";break;
+        case 1:str+="F7F77A";break;
+        case 2:str+="FBFBE3";break;
+        }
+        str+="}";
+        graphlabel[i+used]->setStyleSheet(str);
+        graphlabel[i+used]->setGeometry(last,wpy,ppx*pigtype[0][i],wph);
+        graphlabel[i+used]->setText(QString::number(pigtype[0][i]));
+        graphlabel[i+used]->show();
+        last+=ppx*pigtype[0][i];
+    }
+
+    used+=3;
+
+    for(int i=2;i>=0;i--)
+    {
+        graphlabel[i+used]->setAlignment(Qt::AlignCenter);
+        QString str="";
+        str+="QLabel{background-color: #";
+        switch(i)
+        {
+        case 0:str+="3DF600";break;
+        case 1:str+="7AF053";break;
+        case 2:str+="BAF4A7";break;
+        }
+        str+="}";
+        graphlabel[i+used]->setStyleSheet(str);
+        if(i!=0)
+        {
+            graphlabel[i+used]->setGeometry(last,wpy,ppx*pigtype[1][i],wph);
+        }
+        else
+        {
+            if(isPause)
+            {
+                qDebug()<<"stop here";
+            }
+            graphlabel[i+used]->setGeometry(last,wpy,bord-last,wph);
+        }
+        graphlabel[i+used]->setText(QString::number(pigtype[1][i]));
+        graphlabel[i+used]->show();
+        last+=ppx*pigtype[1][i];
+    }
+
+
 }
 
-void MainWindow::savefile()
+void MainWindow::bchange()
 {
-    QFile fsave("test.in");
-    if(!fsave.open(QIODevice::ReadOnly|QIODevice::Text))
-    {
-        qDebug()<<"open fail";
-        return;
-    }
-    QTextStream tout(&fsave);
-    int a;
-    tout>>a;
-    qDebug()<<a;
-    tout>>a;
-    qDebug()<<a;
+    f_buy.close();
+
+    std::ofstream temp;
+    std::string name="./rec/Year-"+QString::number(globaltime/365).toStdString()+".txt";
+    temp.open(name);
+    temp<<"0";
+    temp.close();
+
+    f_buy.open(name);
+    if(!f_buy.is_open())
+        qDebug()<<"f_buy open fail";
+}
+
+void MainWindow::gsave()
+{
+
+}
+
+void MainWindow::gload()
+{
+
 }
 
 void MainWindow::changeTimeRate()
 {
-    if(timerate>=10)
+    if(timerate>=16)
         timerate=1;
     else
-        timerate++;
+        timerate+=timerate;
     if(globaltimer!=-1)
         killTimer(globaltimer);
     SpeedBut->setText("Speed x"+QString::number(timerate));
@@ -378,15 +566,61 @@ void MainWindow::pac()
         PauseBut->setText("Continue");
         killTimer(globaltimer);
         globaltimer=-1;
+        statistic();
     }
     isPause=!isPause;
 }
 
+void MainWindow::showstatistic()
+{
+    if(!showstat)
+    {
+        statisticbut->setText("Close Statistic");
+        showstat=1;
+        farmdetail->setText("");
+        statistic();
+    }
+    else
+    {
+        showstat=0;
+        for(int i=0;i<120;i++)
+            graphlabel[i]->hide();
+        showfarmdetail(detailid);
+        statisticbut->setText("Statistic");
+    }
+}
+
 void MainWindow::gamestart()
 {
+
+    gamemode=0;
+    clicktype=1;
+
+    for(int i=0;i<100;i++)
+    {
+        blockshow[i]=new QPushButton(this);
+        blockshow[i]->hide();
+    }
+    for(int i=0;i<10;i++)
+    {
+        blockid[i]=i;
+    }
+
+    for(int i=0;i<100;i++)
+    {
+        farms[i].setId(i);
+        heap.push_back(&farms[i]);
+    }
+
+    make_heap(heap.begin(),heap.end(),farmcmp);
+
+    isPause=0;
+    detailid=-1;
+    Req_addpig=0;
     globaltime=0;
-    money=5000;
+    money=500000;
     infrate=0;
+    showstat=0;
     prices[0]=30;
     prices[1]=14;
     prices[2]=12;
@@ -398,21 +632,24 @@ void MainWindow::gamestart()
     globaltimer=startTimer(1000);
     infmon=999999999;
 
-    pig* piglist=buypig(infmon,qrand()%50-100+100*5);
-    balanced_insert(piglist);
-    qDebug()<<"insert end";
-    debuglistout(piglist,0);
-    //debugout();
+    addpig(infmon,qrand()%50-100+100*5);
 
     page=0;
     buildblocks();
 
+    w_save.open("./rec/Year-0.txt");
+    w_save<<"0";
+    w_save.close();
+    f_buy.open("./rec/Year-0.txt");
+
     for(int i=0;i<100;i++)
     {
-        connect(blockshow[i],&QPushButton::pressed,[=](){showfarmdetail(i);});
+        connect(blockshow[i],&QPushButton::pressed,[=](){selectfarm(i);});
     }
 
     qDebug()<<"init end";
+
+    timerEvent(nullptr);
 }
 
 void MainWindow::reqaddpig()
@@ -425,6 +662,7 @@ void MainWindow::slottest()
 {
     pig* tp=new pig(1,globaltime);
     balanced_insert(tp);
+    debuglistout(tp,0);
 }
 
 void MainWindow::changepage(bool dir)
@@ -503,8 +741,16 @@ void MainWindow::viewcreate()
     pagenext->show();
     connect(pagenext,&QPushButton::pressed,this,[=](){changepage(1);});
 
+    dback=new QLabel(this);
+    dback->setGeometry(940,0,340,768);
+    dback->setStyleSheet(
+                "QLabel{"
+                "   border-image: url(:/res/board.png);"
+                "}");
+    dback->show();
+
     farmdetail=new QLabel(this);
-    farmdetail->setGeometry(980,0,300,768);
+    farmdetail->setGeometry(980,80,300,768);
     farmdetail->setText("No Farm Selected");
     farmdetail->setAlignment(Qt::AlignLeft|Qt::AlignTop);
     farmdetail->setStyleSheet(
@@ -528,22 +774,57 @@ void MainWindow::viewcreate()
     connect(testbut,SIGNAL(pressed()),this,SLOT(slottest()));
 
     statisticbut=new QPushButton(this);
-    statisticbut->setGeometry(860,100,70,40);
+    statisticbut->setGeometry(830,100,100,40);
     statisticbut->setText("Statistic");
     statisticbut->show();
-    connect(statisticbut,SIGNAL(pressed()),this,SLOT(statistic()));
+    connect(statisticbut,SIGNAL(pressed()),this,SLOT(showstatistic()));
+
+    for(int i=0;i<3;i++)
+    {
+        numbar[i]=new QLabel(this);
+        numbar[i]->setGeometry(640,130,150,60);
+        numbar[i]->show();
+    }
+    numbar[0]->setStyleSheet("QLabel{border-image: url(:/res/norbar.png)}");
+    numbar[1]->setStyleSheet("QLabel{border-image: url(:/res/infbar.png)}");
+    numbar[2]->setAlignment(Qt::AlignCenter);
+    numbar[2]->setStyleSheet("QLabel{font: 10pt;font-weight: bold}");
+
+    for(int i=0;i<120;i++)
+    {
+        graphlabel[i]=new QLabel(this);
+    }
 
 }
 
-void MainWindow::addpig()
+void MainWindow::updatenum()
 {
-    pig* piglist=buypig(infmon,50);
+    int tnum=0;
+    for(int i=0;i<100;i++)
+    {
+        tnum+=farms[i].getNumber();
+    }
+
+    totpignum=tnum;
+
+    numbar[1]->resize(150*float(totpignum)/1000,60);
+    numbar[2]->setText(QString::number(totpignum)+"/1000");
+}
+
+void MainWindow::addpig(int& mon,int num)
+{
+    pig* piglist=buypig(mon,num);
     balanced_insert(piglist);
     if(piglist==nullptr)
     {
+        f_buy<<"0\n";
         qDebug()<<"no pig left";
     }
-    debuglistout(piglist,0);
+    else
+    {
+        f_buy<<"1\n";
+        debuglistout(piglist,0);
+    }
 }
 
 MainWindow::~MainWindow()

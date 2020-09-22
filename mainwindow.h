@@ -4,16 +4,17 @@
 #include <QMainWindow>
 #include <QTime>
 #include <QDebug>
-#include <QFile>
-#include <QTextStream>
+//#include <QFile>
+//#include <QTextStream>
 #include <QLabel>
 #include <QPushButton>
-#include <QToolButton>
 #include <QImage>
-#include <QPixmap>
 #include <QLabel>
 #include <QIcon>
-
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 #include <vector>
 #include <algorithm>
 
@@ -31,6 +32,7 @@ public:
     explicit MainWindow(QWidget *parent = 0);
 
     int timerate;
+    int clicktype;
     int globaltime;
     int globaltimer;
     int infmon;
@@ -45,6 +47,7 @@ public:
 
     int page;
     int blockid[10];
+    bool showstat;
     int detailid;
     QString recordname;
 
@@ -53,6 +56,7 @@ public:
 
     QLabel* labeltime;
     QLabel* labelmoney;
+    QLabel* numbar[3];
     QLabel* farmdetail;
     QPushButton* PauseBut;
     QPushButton* blockshow[100];
@@ -62,18 +66,31 @@ public:
     QPushButton* pagenext;
     QPushButton* pagepre;
     QPushButton* statisticbut;
+    QLabel* graphlabel[120];
+    QLabel* dback;
 
     void timerEvent(QTimerEvent *);
 
     void balanced_insert(pig*&);
-    void addpig();
+    void addpig(int&,int num=50);
     pig* buypig(int&,int);
 
+    void selectfarm(int);
     void showfarmdetail(int);
     void mainmenu();
     void buildblocks();
     void changepage(bool);
     void viewcreate();
+    void updatenum();
+    void statistic();
+
+    std::fstream f_buy;
+    std::ofstream w_save;
+    std::ifstream r_save;
+
+    void bchange();
+    void gsave();
+    void gload();
 
     void debugout();
     QPushButton* testbut;
@@ -86,9 +103,9 @@ public slots:
     void gamestart();
     void reqaddpig();
     void changeTimeRate();
-    void savefile();
     void pac();
-    void statistic();
+
+    void showstatistic();
 
     void slottest();
 };

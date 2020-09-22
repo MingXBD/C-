@@ -9,5 +9,8 @@
         <file>res/infblack.png</file>
         <file>res/infnormal.png</file>
         <file>res/normal.png</file>
+        <file>res/infbar.png</file>
+        <file>res/norbar.png</file>
+        <file>res/board.png</file>
     </qresource>
 </RCC>

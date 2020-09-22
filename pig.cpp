@@ -63,7 +63,14 @@ pig::pig(bool isi, int time)
     infected=isi;
     buytime=time;
     next=nullptr;
-    //debugout();
+}
+
+pig::pig(bool inf, int buytime, int type, float weight, int id, pig * next):pig(inf,buytime)
+{
+    this->type=type;
+    this->weight=weight;
+    this->id=id;
+    this->next=next;
 }
 
 int pig::globalid=0;
