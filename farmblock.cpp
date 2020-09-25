@@ -67,6 +67,13 @@ int farmblock::getSize()
     return maxsize;
 }
 
+bool farmblock::isProtected(int time)
+{
+    if(protectlen>=time)
+        return true;
+    return false;
+}
+
 pig *farmblock::setblackonly(bool nbo)
 {
     if(nbo==blackonly)

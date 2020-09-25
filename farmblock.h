@@ -29,12 +29,14 @@ public:
     bool isInfected();
     int getNumber();
     int getSize();
+    bool isProtected(int);
 
     bool pigin(pig*);
     void grow();
     void beInfected(int);
     void updateInf();
     float sell(float[3],int);
+
     void debugout();
 
     farmblock* next;

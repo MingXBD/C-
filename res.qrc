@@ -12,5 +12,6 @@
         <file>res/infbar.png</file>
         <file>res/norbar.png</file>
         <file>res/board.png</file>
+        <file>res/shield.png</file>
     </qresource>
 </RCC>

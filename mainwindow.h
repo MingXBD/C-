@@ -4,8 +4,6 @@
 #include <QMainWindow>
 #include <QTime>
 #include <QDebug>
-//#include <QFile>
-//#include <QTextStream>
 #include <QLabel>
 #include <QPushButton>
 #include <QImage>
@@ -51,6 +49,9 @@ public:
     int detailid;
     QString recordname;
 
+    int rectemp[12];
+    bool month_or_year;
+
     std::vector<farmblock*> heap;
     std::vector<farmblock*> bheap;
 
@@ -59,14 +60,17 @@ public:
     QLabel* numbar[3];
     QLabel* farmdetail;
     QPushButton* PauseBut;
+    QPushButton* moyBut;
     QPushButton* blockshow[100];
     QPushButton* StartBut;
     QPushButton* SpeedBut;
     QPushButton* add_pig;
+    QPushButton* pressswitch;
     QPushButton* pagenext;
     QPushButton* pagepre;
     QPushButton* statisticbut;
-    QLabel* graphlabel[120];
+    QLabel* graphlabel[200];
+    QLabel* shieldlabel[100];
     QLabel* dback;
 
     void timerEvent(QTimerEvent *);
@@ -84,7 +88,7 @@ public:
     void updatenum();
     void statistic();
 
-    std::fstream f_buy;
+    std::ofstream f_buy;
     std::ofstream w_save;
     std::ifstream r_save;
 
@@ -104,6 +108,8 @@ public slots:
     void reqaddpig();
     void changeTimeRate();
     void pac();
+    void changepress();
+    void changemoy();
 
     void showstatistic();
 

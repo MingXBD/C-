@@ -62,8 +62,10 @@ void MainWindow::timerEvent(QTimerEvent *)
         money+=tmon;
     }
 
-    if(globaltime%365==0)
+    if(globaltime%360==0)
+    {
         bchange();
+    }
 
     updatenum();
 
@@ -116,7 +118,8 @@ pig* MainWindow::buypig(int &mon,int num)
     }
     mon-=tmon;
 
-    f_buy<<totnum<<' '<<tmon<<' ';
+    f_buy<<globaltime<<' '<<totnum<<' '<<tmon<<' ';
+    rectemp[(globaltime%360)/30]+=totnum;
 
     return thead;
 }
@@ -125,7 +128,10 @@ void MainWindow::selectfarm(int id)
 {
     switch(clicktype)
     {
-    case 1:showfarmdetail(id);break;
+    case 1: showfarmdetail(id);break;
+    case 2: farms[id].setProtect(globaltime,20);
+            buildblocks();
+            break;
     }
 }
 
@@ -136,13 +142,9 @@ void MainWindow::showfarmdetail(int id)
         farmdetail->setText("No Farm Selected");
         return;
     }
-    for(int i=0;i<120;i++)
-    {
-        graphlabel[i]->hide();
-    }
     if(showstat)
     {
-        for(int i=0;i<120;i++)
+        for(int i=0;i<200;i++)
             graphlabel[i]->hide();
         statisticbut->setText("Statistic");
         showstat=0;
@@ -262,6 +264,7 @@ void MainWindow::buildblocks()
     for(int i=0;i<100;i++)
     {
         blockshow[i]->hide();
+        shieldlabel[i]->hide();
     }
     for(int i=0;i<blocknum;i++)
     {
@@ -285,6 +288,9 @@ void MainWindow::buildblocks()
             py=i/5*(ph+10)+200;
         }
         nbut->setGeometry(px,py,pw,ph);
+        shieldlabel[i]->setGeometry(px,py,pw/3,pw/3);
+        if(nfarm->isProtected(globaltime))
+            shieldlabel[i]->show();
 
         QString tss="QPushButton{border-image: url(:/res/";
         if(nfarm->getNumber()==0)
@@ -308,7 +314,7 @@ void MainWindow::buildblocks()
         {
             nbut->setText("FarmId: "+QString::number(nfarm->getId())+"\n"
                           +"Number: "+QString::number(nfarm->getNumber())+"\n"
-                          +"GrowSpeed: "+QString::number(nfarm->getGrowRate())
+                          +"GrowSpeed: "+QString::number(nfarm->getGrowRate())+"\n"
                           );
         }
         else
@@ -326,6 +332,9 @@ void MainWindow::statistic()
     int pignum[2][27]={0};
     int pigtime[13]={0};
     int pigtype[2][3]={0};
+
+    int timelast=0;
+    int typelast=0;
 
     int timeg=15;
 
@@ -350,12 +359,24 @@ void MainWindow::statistic()
             if(temp>=12*timeg)
             {
                 pigtime[12]++;
+                timelast=12;
             }
             else
             {
                 pigtime[temp/timeg]++;
+                timelast=timelast>temp/timeg?timelast:temp/timeg;
             }
             pigtype[isi][tp->getType()]++;
+            if(isi)
+            {
+                int temp=5-tp->getType();
+                typelast=typelast>temp?typelast:temp;
+            }
+            else
+            {
+                int temp=tp->getType();
+                typelast=typelast>temp?typelast:temp;
+            }
 
             tp=tp->next;
         }
@@ -387,7 +408,7 @@ void MainWindow::statistic()
         graphlabel[3*i]->show();
 
         int ttemp=pignum[0][i]*ppx;
-        graphlabel[3*i+1]->setGeometry(wpx+temp+1,wpy+i*(wph+wpg),ttemp,wph);
+        graphlabel[3*i+1]->setGeometry(wpx+temp,wpy+i*(wph+wpg),ttemp,wph);
         graphlabel[3*i+1]->setStyleSheet("QLabel{"
                                        "border-image: url(:/res/norbar.png)"
                                          "}"
@@ -396,8 +417,10 @@ void MainWindow::statistic()
         graphlabel[3*i+1]->setText(QString::number(pignum[0][i]));
         graphlabel[3*i+1]->show();
 
-        graphlabel[3*i+2]->setGeometry(wpx-25,wpy+i*(wph+wpg),30,wph);
+        graphlabel[3*i+2]->setGeometry(wpx-30,wpy+i*(wph+wpg),25,wph);
+        graphlabel[3*i+2]->setAlignment(Qt::AlignCenter);
         graphlabel[3*i+2]->setText(QString::number(float(i*50)/10));
+        graphlabel[3*i+2]->setStyleSheet("QLabel{background-color: #5D5D5D;color: #FFFFFF}");
         graphlabel[3*i+2]->show();
     }
 
@@ -433,7 +456,7 @@ void MainWindow::statistic()
         graphlabel[i+used]->setStyleSheet(QString::fromStdString(str));
 
         int tx=ppx*pigtime[i];
-        if(i!=12)
+        if(i!=timelast)
         {
             graphlabel[i+used]->setGeometry(last,wpy,tx,wph);
         }
@@ -448,7 +471,7 @@ void MainWindow::statistic()
         if((i<10&&tx>=5)||(tx>=7))
             graphlabel[i+used]->setText(QString::number(i));
         else
-            graphlabel[i+used]->setText("test");
+            graphlabel[i+used]->setText("");
 
         graphlabel[i+used]->show();
         last+=tx;
@@ -474,7 +497,20 @@ void MainWindow::statistic()
         }
         str+="}";
         graphlabel[i+used]->setStyleSheet(str);
-        graphlabel[i+used]->setGeometry(last,wpy,ppx*pigtype[0][i],wph);
+
+        if(i!=typelast)
+        {
+            graphlabel[i+used]->setGeometry(last,wpy,ppx*pigtype[0][i],wph);
+        }
+        else
+        {
+            if(isPause)
+            {
+                qDebug()<<"stop here";
+            }
+            graphlabel[i+used]->setGeometry(last,wpy,bord-last,wph);
+        }
+
         graphlabel[i+used]->setText(QString::number(pigtype[0][i]));
         graphlabel[i+used]->show();
         last+=ppx*pigtype[0][i];
@@ -495,7 +531,7 @@ void MainWindow::statistic()
         }
         str+="}";
         graphlabel[i+used]->setStyleSheet(str);
-        if(i!=0)
+        if(5-i!=typelast)
         {
             graphlabel[i+used]->setGeometry(last,wpy,ppx*pigtype[1][i],wph);
         }
@@ -512,17 +548,108 @@ void MainWindow::statistic()
         last+=ppx*pigtype[1][i];
     }
 
+    used+=3;
+    mw=280;
+    wph=170;
+    wpy=520;
+    last=970;
 
+    graphlabel[used]->setGeometry(last,wpy,mw,wph);
+    graphlabel[used]->setStyleSheet("QLabel{background-color: #222222}");
+    graphlabel[used]->show();
+
+    used+=1;
+    mw=280;
+    last=970+20;
+    wpy=690;
+    int wpw=20;
+    wph=160;
+
+    int tmax=0;
+    int t_rectemp[12]={0};
+    for(int i=0;i<12;i++)
+    {
+        t_rectemp[i]=rectemp[i];
+    }
+
+    if(month_or_year)
+    {
+        std::ifstream f_read;
+
+        int tnum[2]={0};
+
+        for(int i=0;i<12;i++)
+        {
+            tnum[i/6]+=rectemp[i];
+        }
+
+        rectemp[10]=tnum[0];
+        rectemp[11]=tnum[1];
+
+        int tyear=globaltime/360;
+
+        for(int i=0;i<5;i++)
+        {
+            rectemp[2*i]=0;
+            rectemp[2*i+1]=0;
+
+            if(tyear-5+i<0)
+                continue;
+
+            std::string name="./rec/Year-"+QString::number(tyear-5+i).toStdString()+".txt";
+            qDebug()<<QString::fromStdString(name);
+            f_read.open(name);
+            f_read.seekg(0);
+
+            int ntime,nnum,nmon,nleft;
+            while(f_read>>ntime)
+            {
+                f_read>>nnum>>nmon>>nleft;
+                rectemp[2*i+(ntime%360)/180]+=nnum;
+            }
+
+            f_read.close();
+        }
+    }
+
+    for(int i=0;i<12;i++)
+    {
+        tmax=tmax>rectemp[i]?tmax:rectemp[i];
+    }
+
+    ppx=float(wph)/tmax;
+
+    for(int i=0;i<12;i++)
+    {
+        int th=wpy-ppx*rectemp[i];
+        graphlabel[i+used]->setGeometry(last,th,wpw,wpy-th);
+        graphlabel[i+used]->setStyleSheet("QLabel{background-color: #"
+                                          +QString::fromStdString(i%2?"EEEEEE":"DFDFDF")+
+                                          "}");
+        graphlabel[i+used]->setText(QString::number(rectemp[i]));
+        graphlabel[i+used]->show();
+        last+=wpw;
+    }
+
+    for(int i=0;i<12;i++)
+        rectemp[i]=t_rectemp[i];
+
+    used+=24;
 }
 
 void MainWindow::bchange()
 {
     f_buy.close();
 
+    for(int i=0;i<12;i++)
+    {
+        rectemp[i]=0;
+    }
+
     std::ofstream temp;
-    std::string name="./rec/Year-"+QString::number(globaltime/365).toStdString()+".txt";
+    std::string name="./rec/Year-"+QString::number(globaltime/360).toStdString()+".txt";
     temp.open(name);
-    temp<<"0";
+    temp<<"-1";
     temp.close();
 
     f_buy.open(name);
@@ -542,7 +669,7 @@ void MainWindow::gload()
 
 void MainWindow::changeTimeRate()
 {
-    if(timerate>=16)
+    if(timerate>=32)
         timerate=1;
     else
         timerate+=timerate;
@@ -566,9 +693,27 @@ void MainWindow::pac()
         PauseBut->setText("Continue");
         killTimer(globaltimer);
         globaltimer=-1;
-        statistic();
     }
     isPause=!isPause;
+}
+
+void MainWindow::changepress()
+{
+    if(clicktype==2)
+        clicktype=1;
+    else
+        clicktype=2;
+}
+
+void MainWindow::changemoy()
+{
+    if(month_or_year)
+        moyBut->setText("Year");
+    else
+        moyBut->setText("Month");
+    month_or_year=!month_or_year;
+    if(showstat)
+        statistic();
 }
 
 void MainWindow::showstatistic()
@@ -595,6 +740,13 @@ void MainWindow::gamestart()
 
     gamemode=0;
     clicktype=1;
+
+    month_or_year=0;
+
+    for(int i=0;i<12;i++)
+    {
+        rectemp[i]=0;
+    }
 
     for(int i=0;i<100;i++)
     {
@@ -628,6 +780,12 @@ void MainWindow::gamestart()
 
     viewcreate();
 
+    w_save.open("./rec/Year-0.txt");
+    w_save<<"0";
+    w_save.close();
+    f_buy.open("./rec/Year-0.txt");
+
+
     timerate=1;
     globaltimer=startTimer(1000);
     infmon=999999999;
@@ -636,11 +794,6 @@ void MainWindow::gamestart()
 
     page=0;
     buildblocks();
-
-    w_save.open("./rec/Year-0.txt");
-    w_save<<"0";
-    w_save.close();
-    f_buy.open("./rec/Year-0.txt");
 
     for(int i=0;i<100;i++)
     {
@@ -790,7 +943,25 @@ void MainWindow::viewcreate()
     numbar[2]->setAlignment(Qt::AlignCenter);
     numbar[2]->setStyleSheet("QLabel{font: 10pt;font-weight: bold}");
 
-    for(int i=0;i<120;i++)
+    pressswitch=new QPushButton(this);
+    pressswitch->setGeometry(0,80,50,50);
+    pressswitch->setText("switch");
+    pressswitch->show();
+    connect(pressswitch,SIGNAL(pressed()),this,SLOT(changepress()));
+
+    moyBut=new QPushButton(this);
+    moyBut->setGeometry(0,200,50,50);
+    moyBut->setText("Month");
+    moyBut->show();
+    connect(moyBut,SIGNAL(pressed()),this,SLOT(changemoy()));
+
+    for(int i=0;i<100;i++)
+    {
+        shieldlabel[i]=new QLabel(this);
+        shieldlabel[i]->setStyleSheet("QLabel{border-image: url(:/res/shield.png)}");
+    }
+
+    for(int i=0;i<200;i++)
     {
         graphlabel[i]=new QLabel(this);
     }
