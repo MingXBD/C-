@@ -51,14 +51,21 @@ void MainWindow::timerEvent(QTimerEvent *)
 
     if(globaltime%90==0)
     {
-        float tmon=0;
+        int tmon=0;
         int sellnum=0;
+        f_sell<<globaltime<<"\n";//start
         for(int i=0;i<100;i++)
         {
-            int temp=farms[i].getNumber();
+            int tempn=farms[i].getNumber();
+            int tempm=sellnum;
             tmon+=farms[i].sell(prices,globaltime);
-            sellnum+=temp-farms[i].getNumber();
+            sellnum+=tempn-farms[i].getNumber();
+            f_sell<<sellnum-tempm<<' ';
         }
+        f_sell<<"\n";
+        f_sell<<tmon<<"\n";
+        f_sell<<"\n";
+
         money+=tmon;
     }
 
@@ -572,52 +579,192 @@ void MainWindow::statistic()
         t_rectemp[i]=rectemp[i];
     }
 
-    if(month_or_year)
+    if(!buy_or_sell)//buy == 0
     {
-        std::ifstream f_read;
+        if(month_or_year)
+        {
+            std::ifstream f_read;
 
-        int tnum[2]={0};
+            int tnum[2]={0};
+
+            for(int i=0;i<12;i++)
+            {
+                tnum[i/6]+=rectemp[i];
+            }
+
+            rectemp[10]=tnum[0];
+            rectemp[11]=tnum[1];
+
+            int tyear=globaltime/360;
+
+            for(int i=0;i<5;i++)
+            {
+                rectemp[2*i]=0;
+                rectemp[2*i+1]=0;
+
+                if(tyear-5+i<0)
+                    continue;
+
+                std::string name="./rec/Year-"+QString::number(tyear-5+i).toStdString()+".txt";
+                f_read.open(name);
+                f_read.seekg(0);
+
+                int ntime,nnum,nmon,nleft;
+                while(f_read>>ntime)
+                {
+                    f_read>>nnum>>nmon>>nleft;
+                    rectemp[2*i+(ntime%360)/180]+=nnum;
+                }
+
+                f_read.close();
+            }
+        }
+        else
+        {
+            /*
+            while(rectemp[11]==0)
+            {
+                for(int i=11;i>0;i--)
+                {
+                    rectemp[i]=rectemp[i-1];
+                }
+                rectemp[0]=0;
+            }
+            */
+        }
 
         for(int i=0;i<12;i++)
         {
-            tnum[i/6]+=rectemp[i];
-        }
-
-        rectemp[10]=tnum[0];
-        rectemp[11]=tnum[1];
-
-        int tyear=globaltime/360;
-
-        for(int i=0;i<5;i++)
-        {
-            rectemp[2*i]=0;
-            rectemp[2*i+1]=0;
-
-            if(tyear-5+i<0)
-                continue;
-
-            std::string name="./rec/Year-"+QString::number(tyear-5+i).toStdString()+".txt";
-            qDebug()<<QString::fromStdString(name);
-            f_read.open(name);
-            f_read.seekg(0);
-
-            int ntime,nnum,nmon,nleft;
-            while(f_read>>ntime)
-            {
-                f_read>>nnum>>nmon>>nleft;
-                rectemp[2*i+(ntime%360)/180]+=nnum;
-            }
-
-            f_read.close();
+            tmax=tmax>rectemp[i]?tmax:rectemp[i];
         }
     }
-
-    for(int i=0;i<12;i++)
+    else //sell == 1
     {
-        tmax=tmax>rectemp[i]?tmax:rectemp[i];
+        std::ifstream f_read;
+
+        for(int i=0;i<12;i++)
+            rectemp[i]=0;
+
+        f_sell.close();
+
+        if(!month_or_year) //month == 0
+        {
+            int count=11;
+            for(int i=3;i>=0;i--)
+            {
+                if(globaltime/360-3+i<0)
+                    continue;
+                std::string name="./sell/Year-"+QString::number(globaltime/360-3+i).toStdString()+".txt";
+                f_read.open(name);
+                f_read.seekg(0);
+
+                int tcount=0;
+                int tnum[8]={0};
+
+                int ntime,nnum=0,nmon;
+
+                while(f_read>>ntime)
+                {
+                    nnum=0;
+                    ntime=(ntime%360)/90;
+                    int temp;
+                    for(int i=0;i<100;i++)
+                    {
+                        f_read>>temp;
+                        nnum+=temp;
+                    }
+                    f_read>>nmon;
+
+                    tnum[tcount++]=nnum;
+                    tnum[tcount++]=nmon;
+                }
+
+                if(f_read.is_open())
+                    f_read.close();
+
+                for(int i=tcount-1;i>=0;i--)
+                {
+                    if(count<0)
+                        break;
+                    rectemp[count]=tnum[i];
+                    count--;
+                }
+                if(count<0)
+                    break;
+            }
+//            for(int i=0;i<12;i++)
+//            {
+//                qDebug()<<rectemp[i];
+//            }
+//            qDebug()<<"end";
+        }
+        else
+        {
+            int count=11;
+            for(int i=5;i>=0;i--)
+            {
+                if(globaltime/360-5+i<0)
+                    continue;
+                std::string name="./sell/Year-"+QString::number(globaltime/360-5+i).toStdString()+".txt";
+                f_read.open(name);
+                f_read.seekg(0);
+
+                int tnum[2]={0};
+
+                int ntime,nnum=0,nmon=0;
+
+                while(f_read>>ntime)
+                {
+                    ntime=(ntime%360)/90;
+                    int temp;
+                    for(int i=0;i<100;i++)
+                    {
+                        f_read>>temp;
+                        nnum+=temp;
+                    }
+                    f_read>>temp;
+                    nmon+=temp;
+                }
+                tnum[0]=nnum;
+                tnum[1]=nmon;
+
+                if(f_read.is_open())
+                    f_read.close();
+
+                for(int i=1;i>=0;i--)
+                {
+                    if(count<0)
+                        break;
+                    rectemp[count]=tnum[i];
+                    count--;
+                }
+                if(count<0)
+                    break;
+            }
+        }
+
+        std::string name="./sell/Year-";
+        name+=QString::number(globaltime/360).toStdString();
+        name+=".txt";
+
+        f_sell.open(name,std::ios_base::app|std::ios_base::out|std::ios_base::ate);
+        //qDebug()<<"out: "<<f_sell.tellp();
+
+        for(int i=0;i<12;i+=2)
+        {
+            rectemp[i]=rectemp[i]*1000;
+        }
+
+        for(int i=0;i<12;i++)
+        {
+            tmax=rectemp[i]>tmax?rectemp[i]:tmax;
+        }
     }
 
-    ppx=float(wph)/tmax;
+    if(tmax!=0)
+        ppx=float(wph)/tmax;
+    else
+        ppx=0;
 
     for(int i=0;i<12;i++)
     {
@@ -626,7 +773,10 @@ void MainWindow::statistic()
         graphlabel[i+used]->setStyleSheet("QLabel{background-color: #"
                                           +QString::fromStdString(i%2?"EEEEEE":"DFDFDF")+
                                           "}");
-        graphlabel[i+used]->setText(QString::number(rectemp[i]));
+        if(!buy_or_sell)//buy
+            graphlabel[i+used]->setText(QString::number(rectemp[i]));
+        else
+            graphlabel[i+used]->setText(QString::number(i%2==0?rectemp[i]/1000:rectemp[i]));
         graphlabel[i+used]->show();
         last+=wpw;
     }
@@ -640,6 +790,7 @@ void MainWindow::statistic()
 void MainWindow::bchange()
 {
     f_buy.close();
+    f_sell.close();
 
     for(int i=0;i<12;i++)
     {
@@ -653,8 +804,19 @@ void MainWindow::bchange()
     temp.close();
 
     f_buy.open(name);
+
+    name="./sell/Year-"+QString::number(globaltime/360).toStdString()+".txt";
+    temp.open(name);
+    temp<<"-1";
+    temp.close();
+
+    f_sell.open(name);
+
+
     if(!f_buy.is_open())
         qDebug()<<"f_buy open fail";
+    if(!f_sell.is_open())
+        qDebug()<<"f_sell open fail";
 }
 
 void MainWindow::gsave()
@@ -708,10 +870,21 @@ void MainWindow::changepress()
 void MainWindow::changemoy()
 {
     if(month_or_year)
-        moyBut->setText("Year");
-    else
         moyBut->setText("Month");
+    else
+        moyBut->setText("Year");
     month_or_year=!month_or_year;
+    if(showstat)
+        statistic();
+}
+
+void MainWindow::changebos()
+{
+    if(buy_or_sell)
+        bosBut->setText("Buy");
+    else
+        bosBut->setText("Sell");
+    buy_or_sell=!buy_or_sell;
     if(showstat)
         statistic();
 }
@@ -780,10 +953,8 @@ void MainWindow::gamestart()
 
     viewcreate();
 
-    w_save.open("./rec/Year-0.txt");
-    w_save<<"0";
-    w_save.close();
     f_buy.open("./rec/Year-0.txt");
+    f_sell.open("./sell/Year-0.txt");
 
 
     timerate=1;
@@ -951,9 +1122,15 @@ void MainWindow::viewcreate()
 
     moyBut=new QPushButton(this);
     moyBut->setGeometry(0,200,50,50);
-    moyBut->setText("Month");
+    moyBut->setText("Year");
     moyBut->show();
     connect(moyBut,SIGNAL(pressed()),this,SLOT(changemoy()));
+
+    bosBut=new QPushButton(this);
+    bosBut->setGeometry(0,300,50,50);
+    bosBut->setText("Sell");
+    bosBut->show();
+    connect(bosBut,SIGNAL(pressed()),this,SLOT(changebos()));
 
     for(int i=0;i<100;i++)
     {

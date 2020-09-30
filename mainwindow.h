@@ -47,10 +47,10 @@ public:
     int blockid[10];
     bool showstat;
     int detailid;
-    QString recordname;
 
     int rectemp[12];
     bool month_or_year;
+    bool buy_or_sell;
 
     std::vector<farmblock*> heap;
     std::vector<farmblock*> bheap;
@@ -69,6 +69,7 @@ public:
     QPushButton* pagenext;
     QPushButton* pagepre;
     QPushButton* statisticbut;
+    QPushButton* bosBut;
     QLabel* graphlabel[200];
     QLabel* shieldlabel[100];
     QLabel* dback;
@@ -89,6 +90,7 @@ public:
     void statistic();
 
     std::ofstream f_buy;
+    std::ofstream f_sell;
     std::ofstream w_save;
     std::ifstream r_save;
 
@@ -99,6 +101,7 @@ public:
     void debugout();
     QPushButton* testbut;
     QLabel* testlabel;
+    bool debugstop;
 
     ~MainWindow();
 private:
@@ -110,6 +113,7 @@ public slots:
     void pac();
     void changepress();
     void changemoy();
+    void changebos();
 
     void showstatistic();
 
