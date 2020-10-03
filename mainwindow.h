@@ -38,13 +38,11 @@ public:
     int totpignum;
     int money;
     int Req_addpig;
-    int gamemode;
     float prices[3];
     farmblock farms[100];
     bool isPause;
 
     int page;
-    int blockid[10];
     bool showstat;
     int detailid;
 
@@ -62,6 +60,7 @@ public:
     QPushButton* PauseBut;
     QPushButton* moyBut;
     QPushButton* blockshow[100];
+    QPushButton* LoadBut;
     QPushButton* StartBut;
     QPushButton* SpeedBut;
     QPushButton* add_pig;
@@ -95,8 +94,6 @@ public:
     std::ifstream r_save;
 
     void bchange();
-    void gsave();
-    void gload();
 
     void debugout();
     QPushButton* testbut;
@@ -114,6 +111,9 @@ public slots:
     void changepress();
     void changemoy();
     void changebos();
+
+    void gsave();
+    void gload();
 
     void showstatistic();
 

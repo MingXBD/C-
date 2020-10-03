@@ -37,6 +37,11 @@ bool farmblock::isfull()
     return number>=maxsize;
 }
 
+void farmblock::setGrowRate(float t)
+{
+    grow_rate=t;
+}
+
 pig *farmblock::getHead()
 {
     return head;
@@ -60,6 +65,11 @@ bool farmblock::isInfected()
 int farmblock::getNumber()
 {
     return number;
+}
+
+int farmblock::getProtectLen()
+{
+    return protectlen;
 }
 
 int farmblock::getSize()

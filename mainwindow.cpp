@@ -91,7 +91,14 @@ void MainWindow::mainmenu()
     StartBut=new QPushButton(this);
     StartBut->setGeometry(200,200,100,100);
     StartBut->setStyleSheet("QPushButton{border-image: url(:/res/start.png)}");
+    StartBut->show();
     connect(StartBut,SIGNAL(pressed()),this,SLOT(gamestart()));
+
+    LoadBut=new QPushButton(this);
+    LoadBut->setGeometry(340,200,100,100);
+    LoadBut->setText("Load");
+    LoadBut->show();
+    connect(LoadBut,SIGNAL(pressed()),this,SLOT(gload()));
 }
 
 void MainWindow::debugout()
@@ -469,10 +476,6 @@ void MainWindow::statistic()
         }
         else
         {
-            if(isPause)
-            {
-                qDebug()<<"stop here";
-            }
             graphlabel[i+used]->setGeometry(last,wpy,bord-last,wph);
         }
         if((i<10&&tx>=5)||(tx>=7))
@@ -511,10 +514,6 @@ void MainWindow::statistic()
         }
         else
         {
-            if(isPause)
-            {
-                qDebug()<<"stop here";
-            }
             graphlabel[i+used]->setGeometry(last,wpy,bord-last,wph);
         }
 
@@ -821,12 +820,168 @@ void MainWindow::bchange()
 
 void MainWindow::gsave()
 {
+    w_save.open("save.txt");
 
+    w_save<<globaltime<<"\n";
+    w_save<<infrate<<"\n";
+    w_save<<money<<"\n";
+    w_save<<Req_addpig<<"\n";
+
+    for(int i=0;i<3;i++)
+    {
+        w_save<<prices[i]<<' ';
+    }
+    w_save<<"\n";
+
+    for(int i=0;i<12;i++)
+    {
+        w_save<<rectemp[i]<<' ';
+    }
+    w_save<<"\n";
+
+    w_save<<"\n";
+    farmblock* nfarm;
+    for(int i=0;i<100;i++)
+    {
+        nfarm=&farms[i];
+
+        w_save<<nfarm->getId()<<' '
+             <<nfarm->getGrowRate()<<' '<<nfarm->getProtectLen()<<'\n';
+        w_save<<(nfarm->isBlackOnly()?'1':'0')<<' '<<nfarm->getNumber()<<'\n';
+
+        w_save<<"\n";
+
+        pig* tp=nfarm->getHead();
+
+        while(tp!=nullptr)
+        {
+            w_save<<tp->getType()<<' '<<tp->getId()<<' '<<tp->getWeight()<<' '
+                 <<(tp->isInfected()?'1':'0')<<' '<<tp->getBuytime()<<'\n';
+            tp=tp->next;
+        }
+
+        w_save<<"\n";
+    }
+
+    w_save.close();
 }
 
 void MainWindow::gload()
 {
+    r_save.open("save.txt");
 
+    if(!r_save.is_open())
+    {
+        LoadBut->setText("Load fail");
+        return;
+    }
+
+    delete StartBut;
+    delete LoadBut;
+
+    timerate=1;
+    clicktype=1;
+    infmon=999999999;
+    infrate=0;
+    isPause=0;
+    page=0;
+    showstat=0;
+    detailid=-1;
+    month_or_year=0;
+
+    r_save>>globaltime;
+    r_save>>infrate;
+    r_save>>money;
+    r_save>>Req_addpig;
+
+    for(int i=0;i<3;i++)
+    {
+        r_save>>prices[i];
+    }
+
+    for(int i=0;i<12;i++)
+    {
+        r_save>>rectemp[i];
+    }
+
+    farmblock* nfarm;
+    for(int i=0;i<100;i++)
+    {
+        nfarm=&farms[i];
+
+        int tid,tpl,tbo;
+        float tgr;
+
+        r_save>>tid>>tgr>>tpl>>tbo;
+
+        nfarm->setId(tid);
+        nfarm->setGrowRate(tgr);
+        nfarm->setProtect(0,tpl);
+        nfarm->setblackonly(tbo);
+
+        int tnum;
+        r_save>>tnum;
+        int pt,pid,pi,pbt;
+        float pw;
+        for(int i=0;i<tnum;i++)
+        {
+            r_save>>pt>>pid>>pw>>pi>>pbt;
+            qDebug()<<pt<<' '<<pid<<' '<<pw<<' '<<pi<<' '<<pbt;
+            pig* np=new pig(pi,pbt,pt,pw,pid);
+            if(!nfarm->pigin(np))
+            {
+                qDebug()<<"pig in fail";
+                exit(1);
+            }
+        }
+
+        if(!tbo)
+        {
+            heap.push_back(nfarm);
+        }
+        else
+        {
+            bheap.push_back(nfarm);
+        }
+    }
+
+    globaltimer=startTimer(1000);
+
+    for(int i=0;i<100;i++)
+    {
+        blockshow[i]=new QPushButton(this);
+        blockshow[i]->hide();
+        connect(blockshow[i],&QPushButton::pressed,[=](){selectfarm(i);});
+    }
+
+    make_heap(heap.begin(),heap.end(),farmcmp);
+    make_heap(bheap.begin(),bheap.end(),farmcmp);
+
+    std::string name="";
+    name="./rec/Year-";
+    name+=QString::number(globaltime/360).toStdString();
+    name+=".txt";
+
+    f_buy.open(name,std::ios_base::app|std::ios_base::out|std::ios_base::ate);
+
+    name="./sell/Year-";
+    name+=QString::number(globaltime/360).toStdString();
+    name+=".txt";
+
+    f_sell.open(name,std::ios_base::app|std::ios_base::out|std::ios_base::ate);
+
+    viewcreate();
+
+    labeltime->setText("Time: "+QString::number(globaltime));
+    labelmoney->setText("Money: "+QString::number(money));
+
+    updatenum();
+
+    buildblocks();
+
+    r_save.close();
+
+    pac();
 }
 
 void MainWindow::changeTimeRate()
@@ -853,7 +1008,8 @@ void MainWindow::pac()
     else
     {
         PauseBut->setText("Continue");
-        killTimer(globaltimer);
+        if(globaltimer!=-1)
+            killTimer(globaltimer);
         globaltimer=-1;
     }
     isPause=!isPause;
@@ -911,7 +1067,6 @@ void MainWindow::showstatistic()
 void MainWindow::gamestart()
 {
 
-    gamemode=0;
     clicktype=1;
 
     month_or_year=0;
@@ -925,10 +1080,7 @@ void MainWindow::gamestart()
     {
         blockshow[i]=new QPushButton(this);
         blockshow[i]->hide();
-    }
-    for(int i=0;i<10;i++)
-    {
-        blockid[i]=i;
+        connect(blockshow[i],&QPushButton::pressed,[=](){selectfarm(i);});
     }
 
     for(int i=0;i<100;i++)
@@ -950,6 +1102,7 @@ void MainWindow::gamestart()
     prices[1]=14;
     prices[2]=12;
     delete StartBut;
+    delete LoadBut;
 
     viewcreate();
 
@@ -965,11 +1118,6 @@ void MainWindow::gamestart()
 
     page=0;
     buildblocks();
-
-    for(int i=0;i<100;i++)
-    {
-        connect(blockshow[i],&QPushButton::pressed,[=](){selectfarm(i);});
-    }
 
     qDebug()<<"init end";
 
@@ -996,13 +1144,6 @@ void MainWindow::changepage(bool dir)
     else
         page--;
     page=(page%11+11)%11;
-    if(page!=10)
-    {
-        for(int i=0;i<10;i++)
-        {
-            blockid[i]=page*10+i;
-        }
-    }
     buildblocks();
 }
 
@@ -1122,13 +1263,13 @@ void MainWindow::viewcreate()
 
     moyBut=new QPushButton(this);
     moyBut->setGeometry(0,200,50,50);
-    moyBut->setText("Year");
+    moyBut->setText("Month");
     moyBut->show();
     connect(moyBut,SIGNAL(pressed()),this,SLOT(changemoy()));
 
     bosBut=new QPushButton(this);
     bosBut->setGeometry(0,300,50,50);
-    bosBut->setText("Sell");
+    bosBut->setText("Buy");
     bosBut->show();
     connect(bosBut,SIGNAL(pressed()),this,SLOT(changebos()));
 
@@ -1155,7 +1296,7 @@ void MainWindow::updatenum()
 
     totpignum=tnum;
 
-    numbar[1]->resize(150*float(totpignum)/1000,60);
+    numbar[1]->resize(int(150*float(totpignum)/1000),60);
     numbar[2]->setText(QString::number(totpignum)+"/1000");
 }
 
@@ -1177,5 +1318,6 @@ void MainWindow::addpig(int& mon,int num)
 
 MainWindow::~MainWindow()
 {
+    gsave();
     delete ui;
 }

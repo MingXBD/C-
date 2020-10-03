@@ -23,11 +23,13 @@ public:
 
     int getId();
     bool isfull();
+    void setGrowRate(float);
     pig* getHead();
     int getGrowRate();
     bool isBlackOnly();
     bool isInfected();
     int getNumber();
+    int getProtectLen();
     int getSize();
     bool isProtected(int);
 

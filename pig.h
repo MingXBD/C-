@@ -29,7 +29,7 @@ public:
 
     pig* next;
     pig(bool, int);
-    pig(bool,int,int,float,int,pig*);
+    pig(bool, int, int, float, int);
 };
 
 void debuglistout(pig*,int);
