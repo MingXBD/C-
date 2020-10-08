@@ -3,7 +3,6 @@
         <file>res/backgound.png</file>
         <file>res/icon.png</file>
         <file>res/start.png</file>
-        <file>res/wood.png</file>
         <file>res/black.png</file>
         <file>res/empty.png</file>
         <file>res/infblack.png</file>
@@ -13,5 +12,18 @@
         <file>res/norbar.png</file>
         <file>res/board.png</file>
         <file>res/shield.png</file>
+        <file>res/glass.png</file>
+        <file>res/cloud1.png</file>
+        <file>res/cloud2.png</file>
+        <file>res/cloud3.png</file>
+        <file>res/cloud4.png</file>
+        <file>res/cloud5.png</file>
+        <file>res/button1.png</file>
+        <file>res/button2.png</file>
+        <file>res/button3.png</file>
+        <file>res/block.jpg</file>
+        <file>res/wood.png</file>
+        <file>res/title.png</file>
+        <file>res/pigbut.png</file>
     </qresource>
 </RCC>

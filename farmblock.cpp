@@ -22,14 +22,17 @@ int farmblock::getId()
     return id;
 }
 
-void farmblock::grow()
+int farmblock::grow()
 {
+    float tmon=0;
     pig* tp=head;
     while(tp!=nullptr)
     {
         tp->grow(float(qrand()%13)/10*grow_rate);
+        tmon+=grow_rate*(qrand()%10);
         tp=tp->next;
     }
+    return tmon;
 }
 
 bool farmblock::isfull()
@@ -47,7 +50,7 @@ pig *farmblock::getHead()
     return head;
 }
 
-int farmblock::getGrowRate()
+float farmblock::getGrowRate()
 {
     return grow_rate;
 }
@@ -60,6 +63,40 @@ bool farmblock::isBlackOnly()
 bool farmblock::isInfected()
 {
     return infected;
+}
+
+int farmblock::killinf()
+{
+    int num=0;
+    pig* pre=nullptr;
+    pig* tp=head;
+    while(tp!=nullptr)
+    {
+        if(tp->isInfected())
+        {
+            number--;
+            num++;
+            if(tp==head)
+            {
+                head=tp->next;
+                delete tp;
+                tp=head;
+            }
+            else
+            {
+                pre->next=tp->next;
+                delete tp;
+                tp=pre->next;
+            }
+        }
+        else
+        {
+            pre=tp;
+            tp=tp->next;
+        }
+    }
+    this->infected=0;
+    return num;
 }
 
 int farmblock::getNumber()

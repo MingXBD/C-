@@ -17,22 +17,25 @@ void MainWindow::timerEvent(QTimerEvent *)
 
     if(Req_addpig>0)
     {
-        while(Req_addpig>0)
+        while(Req_addpig>0&&money>0)
         {
-            addpig(infmon);
+            addpig(money);
             Req_addpig--;
         }
-        add_pig->setText("Add pigs");
+        if(Req_addpig==0)
+        add_pig->setText("买50只猪猪");
+        else
+        add_pig->setText("买50只猪猪("+QString::number(Req_addpig)+")");
     }
 
     bool ninf[100]={0};
     for(int i=0;i<100;i++)
     {
-        if(i-1>=0&&farms[i-1].isInfected()&&qrand()%100<15)
+        if(i-1>=0&&!farms[i-1].isProtected(globaltime)&&farms[i-1].isInfected()&&qrand()%100<15)
         {
             ninf[i]=1;
         }
-        if(i+1<100&&farms[i+1].isInfected()&&qrand()%100<15)
+        if(i+1<100&&!farms[i+1].isProtected(globaltime)&&farms[i+1].isInfected()&&qrand()%100<15)
         {
             ninf[i]=1;
         }
@@ -43,7 +46,7 @@ void MainWindow::timerEvent(QTimerEvent *)
         if(ninf[i])
             farms[i].beInfected(globaltime);
         farms[i].updateInf();
-        farms[i].grow();
+        money-=farms[i].grow();
     }
 
     make_heap(heap.begin(),heap.end(),farmcmp);
@@ -80,8 +83,24 @@ void MainWindow::timerEvent(QTimerEvent *)
         statistic();
     else
         showfarmdetail(detailid);
-    labeltime->setText("Time: "+QString::number(globaltime));
-    labelmoney->setText("Money: "+QString::number(money));
+
+    QString tstr="";
+    if(globaltime/360+1<10)
+        tstr+=" ";
+    tstr+=QString::number(globaltime/360+1);
+    tstr+="年";
+    if(globaltime%360/30+1<10)
+        tstr+=" ";
+    tstr+=QString::number(globaltime%360/30+1);
+    tstr+="月";
+    if(globaltime%30+1<10)
+        tstr+=" ";
+    tstr+=QString::number(globaltime%30+1);
+    tstr+="日";
+    labeltime->setText(tstr);
+
+    labelmoney->setText("金钱: "+Strbignum(money));
+
     buildblocks();
 }
 
@@ -89,16 +108,20 @@ void MainWindow::mainmenu()
 {
     //this->setStyleSheet("QMainWindow{border-image: url(:/res/backgound.png)}");
     StartBut=new QPushButton(this);
-    StartBut->setGeometry(200,200,100,100);
-    StartBut->setStyleSheet("QPushButton{border-image: url(:/res/start.png)}");
+    StartBut->setGeometry(300,330,200,80);
+    StartBut->setStyleSheet("QPushButton{font:20pt;font-weight:bold;border-image: url(:/res/pigbut.png)}");
+    StartBut->setText("开始致富");
     StartBut->show();
     connect(StartBut,SIGNAL(pressed()),this,SLOT(gamestart()));
 
     LoadBut=new QPushButton(this);
-    LoadBut->setGeometry(340,200,100,100);
-    LoadBut->setText("Load");
+    LoadBut->setGeometry(300,420,200,80);
+    LoadBut->setStyleSheet("QPushButton{font:15pt;font-weight:bold;border-image: url(:/res/pigbut.png)}");
+    LoadBut->setText(" 你们的龙王回来了！");
     LoadBut->show();
     connect(LoadBut,SIGNAL(pressed()),this,SLOT(gload()));
+
+    this->setStyleSheet("MainWindow{border-image: url(:/res/title.png)}");
 }
 
 void MainWindow::debugout()
@@ -116,7 +139,7 @@ pig* MainWindow::buypig(int &mon,int num)
     pig* tp;
     while(totnum<num)
     {
-        tp=new pig(qrand()%100<infrate,globaltime);
+        tp=new pig(qrand()%1000<infrate,globaltime);
         totnum++;
         tmon+=prices[tp->getType()]*tp->getWeight();
         if(tmon<mon)
@@ -143,7 +166,24 @@ void MainWindow::selectfarm(int id)
     switch(clicktype)
     {
     case 1: showfarmdetail(id);break;
-    case 2: farms[id].setProtect(globaltime,20);
+    case 2: if(money<10000)
+                break;
+            money-=10000;
+            farms[id].setProtect(globaltime,30);
+            buildblocks();
+            break;
+    case 3: money-=farms[id].killinf()*1000;
+            if(!showstat)
+                showfarmdetail(id);
+            else
+                statistic();
+            buildblocks();
+            break;
+    case 4: if(money<2000)
+                break;
+            money-=2000;
+            labelmoney->setText("金钱: "+Strbignum(money));
+            farms[id].setGrowRate(0.5+float(qrand()%100)/100);
             buildblocks();
             break;
     }
@@ -151,43 +191,66 @@ void MainWindow::selectfarm(int id)
 
 void MainWindow::showfarmdetail(int id)
 {
+    farmdetail->setStyleSheet(
+                "QLabel{"
+                "   font: 9pt;"
+                "   font-weight: bold;"
+                "}");
     if(id==-1)
     {
-        farmdetail->setText("No Farm Selected");
+        farmdetail->setText("\n小傻瓜你还没有选一个猪圈哦Ծ‸Ծ");
         return;
     }
     if(showstat)
     {
         for(int i=0;i<200;i++)
             graphlabel[i]->hide();
-        statisticbut->setText("Statistic");
+        statisticbut->setText("统计");
+        moyBut->hide();
+        bosBut->hide();
         showstat=0;
     }
     detailid=id;
-    QString tstr="Farm :";
-    tstr+=QString::number(farms[id].getId())+"\n";
+    QString tstr="";
     pig* tp=farms[id].getHead();
     if(tp==nullptr)
     {
-        tstr+="No Pig";
+        tstr+="空的猪圈哦ฅ(๑ ̀ㅅ ́๑)ฅ去买猪猪吧";
     }
     else
     {
         while(tp!=nullptr)
         {
             tstr+="\n";
-            tstr+="Pig id: "+QString::number(tp->getId())+"\n";
-            tstr+="    Type: ";
+            tstr+="猪猪编号（全球唯一）: "+QString::number(tp->getId())+"\n";
+            tstr+="    猪猪种类: ";
             switch(tp->getType())
             {
-                case 0:tstr+="Black  ";break;
-                case 1:tstr+="Spotted";break;
-                case 2:tstr+="White  ";break;
+                case 0:tstr+="黑猪猪  ";break;
+                case 1:tstr+="花猪猪  ";break;
+                case 2:tstr+="白猪猪  ";break;
             }
-            tstr+="    Weight: "+QString::number(tp->getWeight())+"\n";
-            tstr+="    Infected: ";
-            tstr+=tp->isInfected()?"Yes":"No ";
-            tstr+="    Buytime: "+QString::number(tp->getBuytime());
+            tstr+="    体重: "+QString::number(float(int(tp->getWeight()*10))/10)+"\n";
+            tstr+="    感染状况: ";
+            tstr+=tp->isInfected()?"ಥ_ಥ被感染了           ":"我还很健康哦(๑> ₃ <)";
+            tstr+="\n";
+            tstr+="    购买时间: ";
+
+            int ttime=tp->getBuytime();
+
+            if(ttime/360+1<10)
+                tstr+=" ";
+            tstr+=QString::number(ttime/360+1);
+            tstr+="年";
+            if(ttime%360/30+1<10)
+                tstr+=" ";
+            tstr+=QString::number(ttime%360/30+1);
+            tstr+="月";
+            if(ttime%30+1<10)
+                tstr+=" ";
+            tstr+=QString::number(ttime%30+1);
+            tstr+="日";
+
             tp=tp->next;
         }
     }
@@ -289,7 +352,7 @@ void MainWindow::buildblocks()
             nfarm=&farms[i];
             pw=40;
             ph=50;
-            px=i%10*(pw+20)+100;
+            px=i%10*(pw+30)+130;
             py=i/10*(ph+10)+140;
         }
         else
@@ -302,7 +365,10 @@ void MainWindow::buildblocks()
             py=i/5*(ph+10)+200;
         }
         nbut->setGeometry(px,py,pw,ph);
-        shieldlabel[i]->setGeometry(px,py,pw/3,pw/3);
+        if(page!=10)
+            shieldlabel[i]->setGeometry(px,py,pw/3,pw/3);
+        else
+            shieldlabel[i]->setGeometry(px,py,pw/2,pw/2);
         if(nfarm->isProtected(globaltime))
             shieldlabel[i]->show();
 
@@ -319,16 +385,15 @@ void MainWindow::buildblocks()
         tss+=".png);font:";
         tss+=QString::number(page==10?13:16);
         tss+="pt;";
-        //if(page!=10)
         tss+="font-weight:bold";
         tss+="}";
 
         nbut->setStyleSheet(tss);
         if(page!=10)
         {
-            nbut->setText("FarmId: "+QString::number(nfarm->getId())+"\n"
-                          +"Number: "+QString::number(nfarm->getNumber())+"\n"
-                          +"GrowSpeed: "+QString::number(nfarm->getGrowRate())+"\n"
+            nbut->setText("猪圈编号: "+QString::number(nfarm->getId())+"\n"
+                          +"猪猪数量: "+QString::number(nfarm->getNumber())+"\n"
+                          +"成长速度: "+QString::number(nfarm->getGrowRate())
                           );
         }
         else
@@ -561,7 +626,7 @@ void MainWindow::statistic()
     last=970;
 
     graphlabel[used]->setGeometry(last,wpy,mw,wph);
-    graphlabel[used]->setStyleSheet("QLabel{background-color: #222222}");
+    graphlabel[used]->setStyleSheet("QLabel{border-image: url(:/res/block.jpg)}");
     graphlabel[used]->show();
 
     used+=1;
@@ -770,12 +835,13 @@ void MainWindow::statistic()
         int th=wpy-ppx*rectemp[i];
         graphlabel[i+used]->setGeometry(last,th,wpw,wpy-th);
         graphlabel[i+used]->setStyleSheet("QLabel{background-color: #"
-                                          +QString::fromStdString(i%2?"EEEEEE":"DFDFDF")+
+                                          +QString::fromStdString(i%2?"EEEEEE":"DFDFDF")+";"+
+                                          "font: 7pt;"
                                           "}");
         if(!buy_or_sell)//buy
-            graphlabel[i+used]->setText(QString::number(rectemp[i]));
+            graphlabel[i+used]->setText(Strbignum(rectemp[i])+"\n只");
         else
-            graphlabel[i+used]->setText(QString::number(i%2==0?rectemp[i]/1000:rectemp[i]));
+            graphlabel[i+used]->setText(Strbignum(i%2==0?rectemp[i]/1000:rectemp[i])+"\n"+(i%2==0?"只":"元"));
         graphlabel[i+used]->show();
         last+=wpw;
     }
@@ -784,6 +850,32 @@ void MainWindow::statistic()
         rectemp[i]=t_rectemp[i];
 
     used+=24;
+}
+
+QString MainWindow::Strbignum(int num)
+{
+    if(num<0)
+    {
+        return "< 0";
+    }
+    if(num<1000)
+    {
+        return QString::number(num);
+    }
+    if(num<1000000)
+    {
+        return QString::number(num/1000)+"K";
+    }
+    if(num/1000000>=10)
+    {
+        return QString::number(num/1000000)+"M";
+    }
+    int temp=(num-1000000*(num/1000000))/1000;
+    if(temp>100)
+    {
+        return QString::number(num/1000000)+"."+QString::number(temp/100)+"M";
+    }
+        return QString::number(num/1000000)+".0"+"M";
 }
 
 void MainWindow::bchange()
@@ -822,6 +914,7 @@ void MainWindow::gsave()
 {
     w_save.open("save.txt");
 
+    w_save<<pig::get_globalid()<<"\n";
     w_save<<globaltime<<"\n";
     w_save<<infrate<<"\n";
     w_save<<money<<"\n";
@@ -868,11 +961,15 @@ void MainWindow::gsave()
 
 void MainWindow::gload()
 {
+    this->setWindowTitle("恭候龙王重新接管百大猪圈！");
+
+    this->setStyleSheet("MainWindow{border-image: url(:/res/glass.png)}");
+
     r_save.open("save.txt");
 
     if(!r_save.is_open())
     {
-        LoadBut->setText("Load fail");
+        LoadBut->setText("你不是龙王呀（读取失败）");
         return;
     }
 
@@ -888,7 +985,11 @@ void MainWindow::gload()
     showstat=0;
     detailid=-1;
     month_or_year=0;
+    buy_or_sell=0;
 
+    int temp;
+    r_save>>temp;
+    pig::setgid(temp);
     r_save>>globaltime;
     r_save>>infrate;
     r_save>>money;
@@ -972,8 +1073,22 @@ void MainWindow::gload()
 
     viewcreate();
 
-    labeltime->setText("Time: "+QString::number(globaltime));
-    labelmoney->setText("Money: "+QString::number(money));
+    QString tstr="";
+    if(globaltime/360+1<10)
+        tstr+=" ";
+    tstr+=QString::number(globaltime/360+1);
+    tstr+="年";
+    if(globaltime%360/30+1<10)
+        tstr+=" ";
+    tstr+=QString::number(globaltime%360/30+1);
+    tstr+="月";
+    if(globaltime%30+1<10)
+        tstr+=" ";
+    tstr+=QString::number(globaltime%30+1);
+    tstr+="日";
+    labeltime->setText(tstr);
+
+    labelmoney->setText("金钱: "+Strbignum(money));
 
     updatenum();
 
@@ -992,7 +1107,7 @@ void MainWindow::changeTimeRate()
         timerate+=timerate;
     if(globaltimer!=-1)
         killTimer(globaltimer);
-    SpeedBut->setText("Speed x"+QString::number(timerate));
+    SpeedBut->setText("游戏速度 x"+QString::number(timerate));
     if(!isPause)
         globaltimer=startTimer(1000/timerate);
 }
@@ -1001,13 +1116,13 @@ void MainWindow::pac()
 {
     if(isPause)
     {
-        SpeedBut->setText("Speed x"+QString::number(timerate));
+        SpeedBut->setText("游戏速度 x"+QString::number(timerate));
         globaltimer=startTimer(1000/timerate);
-        PauseBut->setText("Pause");
+        PauseBut->setText("等一下！");
     }
     else
     {
-        PauseBut->setText("Continue");
+        PauseBut->setText("继续吧");
         if(globaltimer!=-1)
             killTimer(globaltimer);
         globaltimer=-1;
@@ -1017,18 +1132,24 @@ void MainWindow::pac()
 
 void MainWindow::changepress()
 {
-    if(clicktype==2)
+    clicktype+=1;
+    if(clicktype==5)
         clicktype=1;
-    else
-        clicktype=2;
+    switch(clicktype)
+    {
+    case 1:pressswitch->setText("让我看看！");break;
+    case 2:pressswitch->setText("把保护打在猪圈上");break;
+    case 3:pressswitch->setText("坏猪猪西内！");break;
+    case 4:pressswitch->setText("换种饲料换个心情");break;
+    }
 }
 
 void MainWindow::changemoy()
 {
     if(month_or_year)
-        moyBut->setText("Month");
+        moyBut->setText("月");
     else
-        moyBut->setText("Year");
+        moyBut->setText("年");
     month_or_year=!month_or_year;
     if(showstat)
         statistic();
@@ -1037,21 +1158,37 @@ void MainWindow::changemoy()
 void MainWindow::changebos()
 {
     if(buy_or_sell)
-        bosBut->setText("Buy");
+        bosBut->setText("购买记录");
     else
-        bosBut->setText("Sell");
+        bosBut->setText("销售记录");
     buy_or_sell=!buy_or_sell;
     if(showstat)
         statistic();
+}
+
+void MainWindow::changeinf()
+{
+    if(infrate==0)
+    {
+        infrate=4;
+        infBut->setText("自然感染");
+    }
+    else
+    {
+        infrate=0;
+        infBut->setText("无感染");
+    }
 }
 
 void MainWindow::showstatistic()
 {
     if(!showstat)
     {
-        statisticbut->setText("Close Statistic");
+        statisticbut->setText("关闭统计");
         showstat=1;
         farmdetail->setText("");
+        moyBut->show();
+        bosBut->show();
         statistic();
     }
     else
@@ -1060,16 +1197,22 @@ void MainWindow::showstatistic()
         for(int i=0;i<120;i++)
             graphlabel[i]->hide();
         showfarmdetail(detailid);
-        statisticbut->setText("Statistic");
+        moyBut->hide();
+        bosBut->hide();
+        statisticbut->setText("统计");
     }
 }
 
 void MainWindow::gamestart()
 {
+    this->setWindowTitle("努力致富吧少年！");
+
+    this->setStyleSheet("MainWindow{border-image: url(:/res/glass.png)}");
 
     clicktype=1;
 
     month_or_year=0;
+    buy_or_sell=0;
 
     for(int i=0;i<12;i++)
     {
@@ -1095,8 +1238,8 @@ void MainWindow::gamestart()
     detailid=-1;
     Req_addpig=0;
     globaltime=0;
-    money=500000;
-    infrate=0;
+    money=200000;
+    infrate=4;
     showstat=0;
     prices[0]=30;
     prices[1]=14;
@@ -1116,6 +1259,11 @@ void MainWindow::gamestart()
 
     addpig(infmon,qrand()%50-100+100*5);
 
+    for(int i=0;i<100;i++)
+    {
+        farms[i].killinf();
+    }
+
     page=0;
     buildblocks();
 
@@ -1127,7 +1275,7 @@ void MainWindow::gamestart()
 void MainWindow::reqaddpig()
 {
     Req_addpig++;
-    add_pig->setText("Add pigs ("+QString::number(Req_addpig)+")");
+    add_pig->setText("买50只猪猪("+QString::number(Req_addpig)+")");
 }
 
 void MainWindow::slottest()
@@ -1156,11 +1304,10 @@ void MainWindow::viewcreate()
                 "QLabel{"
                     "border-image: url(:/res/wood.png);"
                     "color:yellow;"
-                    "font:30pt;"
+                    "font:20pt;"
                     "font-weight: bold;"
                 "}"
                 );
-    labeltime->setText("Time: 0");
     labeltime->show();
 
 
@@ -1175,34 +1322,37 @@ void MainWindow::viewcreate()
                     "font-weight: bold;"
                 "}"
                 );
-    labelmoney->setText("Money: 0");
     labelmoney->show();
 
 
     add_pig=new QPushButton(this);
-    add_pig->setText("Add pigs");
-    add_pig->setGeometry(640,10,100,40);
+    add_pig->setText("买50只猪猪");
+    add_pig->setGeometry(640,10,100,60);
+    add_pig->setStyleSheet("QPushButton{border-image: url(:/res/cloud5.png)}");
     add_pig->show();
     connect(add_pig,SIGNAL(pressed()),this,SLOT(reqaddpig()));
 
 
     SpeedBut=new QPushButton(this);
-    SpeedBut->setText("Speed x1");
-    SpeedBut->setGeometry(750,10,100,40);
+    SpeedBut->setText("游戏速度 x1");
+    SpeedBut->setStyleSheet("QPushButton{border-image: url(:/res/cloud2.png)}");
+    SpeedBut->setGeometry(750,10,100,60);
     SpeedBut->show();
     connect(SpeedBut,SIGNAL(pressed()),this,SLOT(changeTimeRate()));
 
-    int pagebutsizew=120,pagebutsizeh=40;
+    int pagebutsizew=120,pagebutsizeh=80;
 
     pagepre=new QPushButton(this);
-    pagepre->setGeometry(680,60,pagebutsizew,pagebutsizeh);
-    pagepre->setText("<- Page previous");
+    pagepre->setGeometry(660,80,pagebutsizew,pagebutsizeh);
+    pagepre->setText("<- 上一页");
+    pagepre->setStyleSheet("QPushButton{border-image: url(:/res/cloud1.png)}");
     pagepre->show();
     connect(pagepre,&QPushButton::pressed,[=](){changepage(0);});
 
     pagenext=new QPushButton(this);
-    pagenext->setGeometry(810,60,pagebutsizew,pagebutsizeh);
-    pagenext->setText("Page next ->");
+    pagenext->setGeometry(790,80,pagebutsizew,pagebutsizeh);
+    pagenext->setText("下一页 ->");
+    pagenext->setStyleSheet("QPushButton{border-image: url(:/res/cloud3.png)}");
     pagenext->show();
     connect(pagenext,&QPushButton::pressed,this,[=](){changepage(1);});
 
@@ -1216,38 +1366,132 @@ void MainWindow::viewcreate()
 
     farmdetail=new QLabel(this);
     farmdetail->setGeometry(980,80,300,768);
-    farmdetail->setText("No Farm Selected");
     farmdetail->setAlignment(Qt::AlignLeft|Qt::AlignTop);
+    std::string tstr="";
+    {
+        tstr+=R"('''''''''''''''''''''''''''''''''''':;!||%||%%%%$&@&&&&$$&&$$$&&&@@@@&&&&$$$$$$&@@@@@@#############################@@&@@@@@&&&&&&$%;::'''''''''''''''''''''''''''''''''''''''':::::;)";tstr+="\n";tstr+=
+             R"('''''''''''''''''''''''''''''''''':;|%%%$$$$&&&&&&@@@#&&&&@@&&$$$&&&&$$$$$&$$$$&@@@@##@##############################@@@@@@#@&&@&&$%!;''''''''''''''':::::::::::::::::::::'''''':::;)";tstr+="\n";tstr+=
+             R"('''''':::::::::::::::::::''''''::;!|%$$&$$$$$$$$&#######@@&@@&@@&$$%%$&&&@@@@@@@@@@@@@##################################@@@@@@&&&@@@&|;:''''''''''':::::::::::::::::::::::::'''''::;)";tstr+="\n";tstr+=
+             R"(''''::::::::::::::::::::::::::::;!%$&&&&&&@@###@$$$&&&&&@@@####@@@@@@###########@@@@@@@@@@#################################@@@@@@@@#@&|;::'''''::::::::::::::::;;;;;;;;;::::::''''';)";tstr+="\n";tstr+=
+             R"(''':::;;;;;;;;;;;;;;;;;::::':::;|$&&&&@@@##&$$%|$&@@@@############@@##@#######@@@@@@@@@@@@@@#################################@@###@##@$!:':'::':::::;;;;;;;;;;;;;;;;;;;;;;::::''''';)";tstr+="\n";tstr+=
+             R"(''''::;;;;;;;;;;;;;;;::::::::;!|$&&&&@@@&&&$%%$$&@@###########@@&@&&$$&###############################################################&|:''''::::::::;;;;;;;;;;;;;;;;;;;;;::::''''';)";tstr+="\n";tstr+=
+             R"(''''::;;;;;;:::::::::::;::':;!%&&@@###@@&$$$$$&@&@&&@#########@&$%%%%%$$&@@############################################################%:'''::::::::::;;;;;;;;;;;;;;;;;;;;::::''''';)";tstr+="\n";tstr+=
+             R"('''':::;;;:::::::::::::::::;|$&@@@#####@&&&&&$$$&&&&$&@#@@#####&$$%|||%$&&&@@@@@@@@@@@@@@@#############################################@|::::::::::::::;;;;;;;;;;;;;;;;;;;::::''''';)";tstr+="\n";tstr+=
+             R"('''':::;;;;::::::::::::::;;|$&@@@#####@&&&&&&&&&&$&@@&&@#############@&$%%%$@@&&@@@@@#@@@@@@@@##########################################$;''':::::::::;;;;;;;;;;;;;;;;;;::::''''''';)";tstr+="\n";tstr+=
+             R"('''':::;;:::::::::::::::::!$&@@###@@@&&&&&&&&&&&&&@@###################@@&$$$&@&&@@@@@##################################################&!:'::':::::::;;;;;;;;;;;;;;;;;;::::''''''';)";tstr+="\n";tstr+=
+             R"(''''::::;::::::::::::::::;%&@@@#####@@##@@@@@@@@@&$$&@@@@@@@@@@###########@&$$&@@@@######@##############################################%;''::':::::::;;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"('''''::::::::::::::::::::!$&&@@@##@@@#@@####@@@@&@@&$$&@@@@#####@@@@@######@&&@#@###@@@##@@############################################@$!:'''':::::::;;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(`''''::::::::::::::::::::;|&@@####@@#######@@&&&&@@&&&$$$&&$$$$$$$$$$$&@@@##@@@@@@@@##@@@@@@@@@@#######################################@|;:'''':::::::;;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(`'''':::::::::::::::::::::!$@########@@###@&&&&&$&$%%%%%%||!|||||!!|||%%%$$&&&&&&&&&@@##@@@@@@@@#######################################&!:''''':::::::;;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(``''':::::::::::::::::::::;%@#######@@@#@@&&&$$%$%%|||%|!;;!!!;;;;;;;;!!!||||%%%%$$&&&@@@@&&@@@@@@@@###################################&!:''''':::::::;;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(``'''':::::::::::::::::::::|$@####@@#@@@@&&&$%%|||!!|!!;::;;;;;;;;;;;;;;;;;;!!!|||%$$$$&&&&&&&@@@@@@@##################################&!''''''''::::::;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(``'''::::::::::::::::::::::!$@@#####@@&&&@&%%%||!!!!!;;:::;;;;;;::::::::;;;;;!!!!!||%%%%$&&&$$$&&&@@@@#################################@|''`''''::::::;;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(``'''::::::::::::::::::::::!%@####@@@@@&&&%|%!!!!!!!;:''':::::::::::::::::;;;;;;!!!||%%%%%%%$$$$$$&@@@@################################@|:''''':::::::;;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(``'''':::::::::::::::::::::;%&##@@@&&&&$&$|||;;;;;;;:'''::::::::::::::::::::;;;;;;!!!!|%%|||%%%%$$$$$&@@###############################@|:'`'''''::::::;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(``'''':::::::::::::::::::::;%&@@@@&&$$$%%$|!;;;:::::'''::::::::::::::::::::;;;;;;;;;!!!!||||||||||%$$$$&&@########@@@@#################@%:''''''''::::::;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(``''':::::::::::::::::::::::!$&@@&&&&$%||||;::::::::::::::;;::;;:;;;;:::;;;;;;;;;!!!!!!!!!!!!!!||!|||%%%$&@######@@@@@@@###############@|:'''':::::::::::;;;;;;;;;;;;;;;;:::''''''':)";tstr+="\n";tstr+=
+             R"(``''':::::::::::::::::::::::!%&@@@&&$%|!;!;:::':'':'''''::::::::::::::::;;;;;;;;;;;;;;;;;!!!!!!!!!!!|||%%$&@#####&&&$&&@@@#############$;''''''::::::::::;;;;;;;;;;;;;;;;:::''''''':)";tstr+="\n";tstr+=
+             R"(```'''::::::::::::::::::::':;|&@@@&&$%|;:::::'''''''''':::::::::::::::;;;;;;;;;;;;;;;;;;;;;!!!!!!!!!!!|||%$&###@@&$$$$$&&@#############$!'''''''::::::::;;;;;;;;;;;;;;;;;:::''''''':)";tstr+="\n";tstr+=
+             R"(```''':::::::::::::::::::::::!$@@@&&$%!;'''''''''''''''''::'''':::::::::;::::::::;;;;;;;;;;;;;;;;!!!!!!!||%$@##@$$%%%%$$$&@@##########@|'```''':::::::;;;;;;;;;;;;;;;;;;;:::''''''':)";tstr+="\n";tstr+=
+             R"(```'''::::::::::::::::::'''::;|$@@&&$|;:''''''''''''''''''''''''''''':::::::::::::::::::::;;;;;;!!!!!!!!|||%&@@&$%%%%%$$$$@@##########$!:''''''''::::::::::;;;;;;;;;;;;;;:::''''''':)";tstr+="\n";tstr+=
+             R"(```'''::::::::::::::::::::::::;%&@@&%!;:'''''''''''`''''''''```'''''::::::::::::::::::::::::;;;;;;!!!!!!!!!|%$$$%%%%%%%%%$&@@########@|:'''''''''::::::::::;;;;;;;;;;;;;;:::''''''':)";tstr+="\n";tstr+=
+             R"(```''':::::::::::::::::::::::::!$@@&%!;:''''''''```````````````'''''':::::''''''''':::::::::;;;;;;!!!!!!!!!||%%%%%%%%%%%%%$&@########&!'`''''''''::::::::::;;;;;;;;;;;;;;:::''''''':)";tstr+="\n";tstr+=
+             R"(````''':::::::::::::::::::'::::;%@@&%!:::'''''````````'`````'''''':::::::::::''::::::::;;;;;;;;;;;;;!!||%|||||||%|||%%%%%%$&@#######@|:''''''''''::::::::::;;;;;;;;;;;;;;:::''''''':)";tstr+="\n";tstr+=
+             R"(```'''::::::::::::::::::::::::::!$@&%!;::'''''``'''::;;::::':::::::;;;;::::::::::;;;;;;;!!!!!|||%%%$$$&&&$$$$%||%||||||||%%$@#######$!!|||;'''':::::::::;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(```'''::::::::::::::::::::::::::;|&@%!:''::'`':;!|%%%%%%%%||||!!!!;;;;;;;;;;;;;;;;!!|||%$$&&&&@@#######@@@@@@@&$%%%%%||||%%$@#######@$$$$$$%!''::::::::::;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(```''':::::::::::::::::::::::::::!$&$!::::::;!|%$&&&&&&@@@@@@@&&&&$%%||!!!!;;!!!!!||%%$$&&@@@@#######@@@@@@@@@@@&%%|||||||%$&######@&%|%$$&&%;::':::::::::;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(```'''::::::::::::::::::::::'''':;|&&|:::::!|$$$$&&&&&@@@@@@@&&&&&$$%%|||!!!;;;!!!||%%%%$$$$$$$$%%%%%|||||||||%%%%||||||||%$&#####$%%%%$&$$$%!''''::::::::::;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(```''':::::::::::::::::::::::'':':|$&|;:''::;!!!||||||%%$$$$%%%%%%$%%%%||!!!;;;!!|||%%%%%|||$&&@#@@#####@&%|||||||||||||||%$&###@&$%%%$$$$$$%!:'':::::::::::;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(```''':::::::::::::::::::!%%%|;;::;|$|:'''::;;!!||%$&@@&$$@####@$||%%|||!!;;;:;;!||||%%|||$&$|!!$@@@@##@@@&$%%|||||||||||||%&##@&$$$$%%%$$%%|;:'':::::::::::;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(````''::::::::::::::::::;!||%%%%||||$|:'''':;;!!|$&&$|;;;!@#@@###$%||||!;;::'':;!||%%%|||%$%|;;:;%@##@&$$&$$%|||!!!!!!|||||%&##@&$$%%||%%%%%|:''':::::::::::;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(.```'''::::::::::::::::';|||%||!||%%%!:''''':;;!|%||||||!;!%&@#@&&$%||!!;:''''::;||%%||!|$$%%%|||||||%%$$%%|||!!!!!!!!!||||%$@#@&&$$%||%%%%|!'':':::::::::::;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(.````'''::::::::::::::::;!||||||!!!|%!:''```'''::;;!!!!|||||||!|%%|||!!!:'''``':;!|%%|!!!!||||||!!!|||||||!!!!;!!!!!!!!!|||%%&@&&&$$%||%%%|!:''::::::::::::::::;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(.````''':::::::::::::::::;!|%||!;;!||!'''````````'':;;!!!!!|||||||!!!!!;:'````':;!|%||!!;!!!!!!!!!!!!!!!;;;;;;;;;!!!!!!!|||%%&&&$$$%%||%%%|;'''':::::::;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(.````'''::::::::::::::::::;!||!!;!!||!:''````````'''::;;!!!!!!!!!!;;;;;:'``````':!|||||!;;;;;;;;;;;!!!!!!;;;;;;;;;;;!!!!||%%%$&$$%%$%%%%$%!''::::::::::;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(.````''':::::::::::::::::::;!!!!;!!||!::'`````````'''::::::;;;;;;;::::'''````.`':;!||||!!;;;;;;;;;;;;;;;;;;;;;;;;;!!!!!|||%%%$&$$$$$%%%%%!:':::::::::::;;;;;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(.```''':':::::::::::::::::::;!!!;;!||!:'''`````````'''':::;;;;;;;:::'''```````'':;!|||!!!;;;;;;;;;;;;;;;;;;;;;;;;!!!!!|||%%%%$@@@@&$$%%%|:':::'':::::::::::::;;;;;;;;;;;:::'''''''':)";tstr+="\n";tstr+=
+             R"(.```'''::::::::::::::::::::::;;;;;;!|!;:''`````''''''::::::;;;:::::'''''``````'':;!||||!!!!;;;;;;;:::;;;;;;;;;;;!!!!!!|||%%%$$&&$%$$$%%|;'''''::::::::::::::;;;;;;;;;;;;:::'''''''':)";tstr+="\n";tstr+=
+             R"(.```'''':::::::::::::::::::::::;;;;;;;;;:''''''''':::::::::::::::''''''''''```'':;!||||!!!!;;;;;:::::::::;;;;;;!!!!!!!||%%%$$$$$$$$%$%|;::::''::::::::::::::;;;;;;;;;;;;:::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''::::::::::::::::::'':::::;;::::;;:'''::::::::::::::::::::'''''''''''`''':;!|||||||||!;;;;::::::::;;;;;;!!!!!!|||%%%$$$&$$$%%%|:'''''':::::::::::::::;;;;;;;;;;;;:::'''''''':)";tstr+="\n";tstr+=
+             R"(.```'''::::::::::::::::::::::::'::::'':;;:::::'''::::::::::::::::::;'`'''''''''::;!|||!!;!!|%||;;;;;:::;;;;;;;!!!!!!|||%%%%%$&&&$%%%!:'''':::::::::::::::::;;;;;::::::::::::''''''':)";tstr+="\n";tstr+=
+             R"(.```'''::::::::::::::::::::::::::::''''';;;;:::::::::::::::::::':;;:''`''``````':;!!!;;:::;!|||%|!!;;;;;;;;;!!!!!!!!|||%%$$%$$$$%%|:''::'':::::::::::::::::;;;;;::::::::::::''''''':)";tstr+="\n";tstr+=
+             R"(.```''':::::::::::::::::::::::::::::::'':;;;::::::::::::::::::::!!:``''```````''':;;;;::;;!!|%%||||!!;;;;;;;!!!!!!||||%%%%%$$$$%|:'':''''':::::::::::::::::;;;;;::::::::::::''''''':)";tstr+="\n";tstr+=
+             R"(.```'''::::::::::::::::::::'''':::::::::;;;;;;:::::::::::::::::;;;'`'''''''''''::;!!!!!!||||%%%|!|||||!!!!!!!!!!|||||%%%%%$$%|;'``''``':'::::::::::::::::::;;;;;::::::::::::''''''':)";tstr+="\n";tstr+=
+             R"(..```''':::::::::::::::::::::::::::::::::;;;;;:::::::::::::::::;;;;!!;;;;;;;;:::;;!!|%%$$$$$$%||!!!|%%||!!!!!!!!||||%%%%%%%%;:'`''''::::'::::::::::::::;;;;;;;;;;;:::;;:::::''''''':)";tstr+="\n";tstr+=
+             R"(..```''':::::::::::::::::::::::::::::::'':;!!;;:::::::::::::::;;;;!|$&&&&%|!!!!!||%%$$$$$$%%%|!!!!!!!||%||!!!!!||||%%%%%%$%|:''`''''::::::::::::::::::::;;;;;;;;;;:::;;:::::''''''':)";tstr+="\n";tstr+=
+             R"(..```''''''::::::::::::::::::::::::::::''::;!!;;;;:::::::::::;;::'';!%%%%%%%%%%%$$$$$$%%%%|||||!!!!!|||%%||!!|||||%%%%%%$$%!''''''':::::::::::::::::::::::::;;;;;;:::;;:::::''''''':)";tstr+="\n";tstr+=
+             R"(...``'''''''::::::::::::::::::::::::::::''::;!!;;;;;::;;;;:::::::'''':;!|||||%%%%%%%%||||!!!!!!!|||||||||||!!|||||%%%%%%$$%:''''''':::::::::::::::::::::::::;;;;;;:::;;:::::''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::::''''':::':;!!;;;;;;;;::::::::'''''::;!!!!!!!|||||!!!!!!!!!!!;!|||||||||||!!!||||%%%%%$$$|''''''''':::::::::::::::::::::::;;;;;;;;::::::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::::''''''::'':;!!;;;;;;;;;;;:::::''''''::;;!!!!!!!!!!;!!!!|||||||%%$%%|||||!!!||||%%%%%%$$|:''''''''':::::::::::::::::::::::;;;;;;;;::::::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::::'''''''::'':!!!;;;;;;;;;;:::::::::::::::;;;;!!!!!!!||%$$$$&@@#@&%|||||!!!!!|||||%%%%$$$!'''''''''::::::::::::::::::::::::;;;;;;;;::::::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::::'''''::'::'':;!!!;;;;;;;;:;;;;;;;;;:::;;!!|%%%$$$$$$&&@@@@@&$%%|||||!!|!!!!|||%%%%%$$$!''``''''''::::::::::::::::::::::::;;;;;;;;::::::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::''''''''''''''':!!!;;;;;;:::;;!!!||!!!||%%%$$$$$$$$&&&&$$%%%%%%%%|!!!!!!!!!!|||%%%$&$$$|:'``'''''''::::::::::::::::::::::;;;;;;;;;:::::::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::''''''''''''''':;!!!!!;;;;;;;!!!||%$$&@&&&&&&$$$%%%%%%||||%%%%%||!!!!|||!!!||%%%%$%$$&!''''''''''''::::::::::::::::::::::;;;;;;;;;;::::::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::''''''''''''''''';!!!!!;;;;;;!!!!||||%%%%%%%|||||||||||||%%%||||!!!!!!!!!!!||%%%%$$&&|:```'''''''''::::::::::::::::::::::;;;;;;;;;;;;::::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::'''''''''''''''''':;!!!!!!!!!!;;;;;;;;;;!!!|||||||||||%|||||||||||!|||||!|||%%%$$$&&&!'``'''`''''''::::::::::::::::::::::;;;;;;;;;;;;;;::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::::::::::'''''''''''';!!!!!!!!!!;!;;;;;;;;;;;;!!!!|||||%%%%||||!||!||||!!!||%%%$$$&&&$!'````'''''''''::::::::::::::::::::;;;;;;;;;;;;;;;;:::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::::::::::::::::::'''''''''':'':!!!!!;!!!;;;;;;;;!!!!!!!!!|||%%|||||||!!!!!!!|||!!||%%%%$&&&&&$;'````'''''''''::::::::::::::::::::;;;;;;;;;;;;;;;::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''':::::::::::::::::::::::::::::''''''''''':'':;!|!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!||||||%%$$&&&&$$$!'``````''''''''':::::::::::::::::;;;;;;;;;;;;;;;;::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''':::::::::::::::::::::::::::::''''''''''''':'';!|!!!!!!!!!!;;;;;;;;;;;;;;;;;;;;;;;!!!!!!|||||%%%$$&&&&&$$&$!'```````'''''''''::::::::::::::::::::::::;;;;;;;;::::'''''''':)";tstr+="\n";tstr+=
+             R"(..```''''':::::::::::::::::::::::::::::::'''''''''''''''':!||!!!;;;;;;;::::::::::::;;;;;;;;;;;!!!|||||%%%$&&&&&&&$$&$%;:'```''''''''''''::::::::::::::;;:::::;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''':::::::::::::::::::::::::::::'''''''''''''''''':!||||!;;::::::::::::::;;;;;;;;;;!!!!!!|||%%$$&&&&&$$$$$$$$$&&$%!:''''''''''':::::::::::::::;;:::::;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(..```'''''::::::::::::::''''''':::::::::'''''''''''''''''::;!!|||!!!;;:::::::;;;;!!!!;!!;;;!!!!!||%$$&&&&&$$$$$$$$$$$$$&@@@&$!'```''''':::::::::::::::;;;:::;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(..```''''''':::::::'''''''''''':::::::::'''''''''''''''''':;;!!|%%%|!!!!!;;;;;!!!!!!!!!!!!!!!|||%$$&&&&$$$$$$$$$$$$$$$$&####@&&|;'`''`'''''''::::::::::;;;:;;;;;;;;;;;;;::::''''''':)";tstr+="\n";tstr+=
+             R"(...``'''''''''':::::::::''''''':::::::::''''''''''''''''''::;;;!!!|%$%%|||!!!!!!!!!!!!!!||!||%%$&&&&&$$$$$$$$$$%%%%%%$$$&####@@@&%!;:''':'''':'':::::::::::::::;;;;;;;;:::::''''''':)";tstr+="\n";tstr+=
+             R"(...```''''''''''''''''''''''''''''''''''''''''''''''''''''::;;;;!!!!!|%$$%%%%%%||||||||||%$$$&&&&$$$$$$$$%%%%%%%%%%%%$$$$&###@&&$&&%!;:'''''''::::::::::::::::::::::::::::::''''''':)";tstr+="\n";tstr+=
+             R"(....```''''''''''''''''''''''''''''''''''''''''''''''''''''::;;;;!!|!!!||%%$$$$$$$$$$$$$$$$$$$$$$$$$$$$$%%%%|||||||%%%$$$$&@###@@&$&&$|!:'`''''':::::::::::::::::::::::::'''''''''';)";tstr+="\n";tstr+=
+             R"(....``````'''''''''''''''''''''''''''''''''''''''''''''''''':;;;;;;!!!|||||%%%%%%%%%%$$$$$$$$$$$$$$$$%%%%%||||||||||%%%$$$$&@#####@@&&@&|;::'''''':::::::::::::::::::::::::'''''''';)";tstr+="\n";tstr+=
+             R"(...`````'''''''''''''''''''''''''''''''''''''''''''''''''''':::;;;;;!!!!!!||%%%$%%$$$$$$$$$$$$$$$$$%%%||%||||||||||||%%$$$$$&@###@@@@@@@&&$|;'''''::::':::::::::::::::::::'''::::::;)";tstr+="\n";tstr+=
+             R"(....`````''''''''''''''''''''''''''''''''''''''''''''''''''':::;;;;;;!!!!!!|||%%%%%%$$$$%%%%%%%%%%%%%|||||!!!!||||||||%%$$$$&@@@@@@@@@&@@@@&&%;;;::::::;;;;;;;;;;;;;;;;;;;;;;;;;;;;;)";tstr+="\n";tstr+=
+             R"(````'''''''''''''''':::::::::::::::::::::::::::::::::::::;!||!;::::;;;;;!!!||%%%%%%%%%%%%%%%%%%%%%%|||||!!!!!!!!!|||||%%$$$$$$&@@&&&&&&&@@&&&&$|;;;!!!!!!!!!!!!!!!!!!!!||!!!!||||||!)";tstr+="\n";tstr+=
+             R"('''::::::::;;;;;::;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;!%&@$!;:::::;;;;!!!|||%%|||||||||||||||||||!!!!!!!!!!!!!!!|||||%%%$%%$&&&&&&&$$&&&@@@&$&$%%|||||%%%%%%%%%%%%%$$$$$%%$$$$$$$|)";tstr+="\n";tstr+=
+             R"(;;;!!!!!!!!!!!!!!!!!!!!||||||||||||||||||||||||||||%%||%$@##@|;::::;;;;;!!!|||||||||||||||||||||!!!!!!!!!!!!!!!!!!|||||%%%%$%%&@@@&&&@@@@@@&&&$$$$&&&&&$$&&@@@@@###@@@@@#@@@@@@@###$)";tstr+="\n";tstr+=
+             R"(%%%%$$$$$$$$$$$$$$$$$$$$$&&&&&&&&&&&&$$$$$$$$$&&&&&%||%&@###@%;::::;;;;;;;!!!!!!|!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!||||||%%%%$&@&&&&&&@@##@@@&$$$&&&&&&&$$$&@@####################$)";tstr+="\n";tstr+=
+             R"(@@#######################################@@@@@##@&$%|%$@####@%;:::::;;;;;;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!|||||%||%&@&&&&&&&@@@@&$$$$$$&@@&&$$$$$$$%$$&@################$)";tstr+="\n";tstr+=
+             R"(##########################################@###@&$%|%%$&#####@|;::::::;;;;!!!!!!!!!!!!|||||!!!!!!!!!!!!!!!!!!!!!!!!!!!!|||||%%$&&&&&&&&&&&@@@&@@&$$$&&&&&&&&$$%%%%%%%$&&@###########$)";tstr+="\n";tstr+=
+             R"(##########################################@@##&%|||$&@######$!::::::::;;;!!!!!!!!!!||!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!||||$@@@@@&@@@@@&&&&@&&&&&&&&&&&@&&&@@@@@@@&&$$$%%%%$&#######$)";tstr+="\n";tstr+=
+             R"(############################################@&%||%$&@######@|;:':::::::;;!!||!!|||||||!!!!!!!!!!!!!!!!!!!!!!;;;;;;!!||||$@###@&&&&@@@@@@@@@@@@@@&&&&@@&&@&&&&&&&&&&$$$$$$$$$$$%$@@#$)";tstr+="\n";tstr+=
+             R"(############################################&%||%$&@@######$;:''::::::::;;;;;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!;;;;!!!!|$@####@@@@@#@@@@@@&&&&@@@@@@@&@@#@###@@@@@@@@@@@@@@@@&$$$$$%%$|)";tstr+="\n";tstr+=
+             R"(##########################################@$||%$&@@#######&!:'''::::::::;;;;;;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!|%&##################@@@@@#####@@@@@##@@@@@@@@###@@@@@##@&&&@@@&&&%)";tstr+="\n";tstr+=
+             R"(#########################################&%||%$&@########@%;'''''':;;::;;;;;;;;;;;;;;;;!!!!!!!!;;!!!!!!;;!!!!|%&###########@@############@@@#######@@#@@###@@@@@@@&&&@##@@@@@&&&@@@%)";tstr+="\n";tstr+=
+             R"(######################################@@$%%%$&&@########@&|:''```'':::::::::;;;;;;;;;;;!!;;;;;;;!!!!!!!!||%&@############@@@####@@####@@@@#####@@@@&@#####@&@@@@@@&&@@####@@&@@@@@@$)";tstr+="\n";tstr+=
+             R"(#################################@@&&$%%%%$&@@@#########@&%!:''''`'':::'''::::::;;;;;;;;;;;;;!!|||!!|%$@#################@@@@@@@@@@@@###@@@@@@@@@@#######@@@@@@&&$$$&@@@@@###@@@@@@%)";tstr+="\n";tstr+=
+             R"(##############################@@&$$$$$%%%$&@@@@##########@$|;:::'``'''''''::::::;;;;;;;;;;;;;!!|%$@####################@@@@@@####@@@@@@@@@@@@@###@@@@###@&&&$$&$$$$&&@@@&&&&$$&&&&&%)";tstr+="\n";tstr+=
+             R"(###########################@@&$$$$$$$%|%$&@@@@@############@&%|;:'``''''''':::;;;;;;;;;;;!|$&@########################@&&&@@@######################@@@@@@&&&&&&&&$$&@@@@@@@@@@@@@@@%)";tstr+="\n";tstr+=
+             R"(######################@@&&&$$$$$$&&&$%%$&@@@@@###########@######@&$%|!;:::;;;!!|%$$$&@@@#############################@@@@@@################@@@@@&@@&&&@@&&&&&&&&$$$&@@@@@@@&&&&@@&&%)";
+    }
+    farmdetail->setText(QString::fromStdString(tstr));
     farmdetail->setStyleSheet(
                 "QLabel{"
-                "   border-image: url();"
-                "   font: 10pt;"
-                "   font-weight: bold;"
+                "   font: 1pt;"
                 "}");
     farmdetail->show();
 
     PauseBut=new QPushButton(this);
-    PauseBut->setGeometry(860,10,70,40);
-    PauseBut->setText("Pause");
+    PauseBut->setGeometry(860,10,70,60);
+    PauseBut->setText("等一下！");
+    PauseBut->setStyleSheet("QPushButton{border-image: url(:/res/cloud4.png)}");
     PauseBut->show();
     connect(PauseBut,SIGNAL(pressed()),this,SLOT(pac()));
 
     testbut=new QPushButton(this);
-    testbut->setGeometry(0,0,50,50);
-    testbut->setText("test");
+    testbut->setGeometry(1000,20,50,40);
+    testbut->setText("（危）");
+    testbut->setStyleSheet("QPushButton{border-image: url(:/res/button1.png)}");
     testbut->show();
     connect(testbut,SIGNAL(pressed()),this,SLOT(slottest()));
 
     statisticbut=new QPushButton(this);
-    statisticbut->setGeometry(830,100,100,40);
-    statisticbut->setText("Statistic");
+    statisticbut->setGeometry(1060,20,100,40);
+    statisticbut->setText("统计");
+    statisticbut->setStyleSheet("QPushButton{border-image: url(:/res/button3.png)}");
     statisticbut->show();
     connect(statisticbut,SIGNAL(pressed()),this,SLOT(showstatistic()));
 
     for(int i=0;i<3;i++)
     {
         numbar[i]=new QLabel(this);
-        numbar[i]->setGeometry(640,130,150,60);
+        numbar[i]->setGeometry(245,20,150,60);
         numbar[i]->show();
     }
     numbar[0]->setStyleSheet("QLabel{border-image: url(:/res/norbar.png)}");
@@ -1256,22 +1500,31 @@ void MainWindow::viewcreate()
     numbar[2]->setStyleSheet("QLabel{font: 10pt;font-weight: bold}");
 
     pressswitch=new QPushButton(this);
-    pressswitch->setGeometry(0,80,50,50);
-    pressswitch->setText("switch");
+    pressswitch->setGeometry(245,85,150,50);
+    pressswitch->setText("让我看看！");
+    pressswitch->setStyleSheet("QPushButton{font:10pt;font-weight: bold;border-image: url(:/res/button3.png)}");
     pressswitch->show();
     connect(pressswitch,SIGNAL(pressed()),this,SLOT(changepress()));
 
     moyBut=new QPushButton(this);
-    moyBut->setGeometry(0,200,50,50);
-    moyBut->setText("Month");
-    moyBut->show();
+    moyBut->setGeometry(980,710,100,50);
+    moyBut->setText("月");
+    moyBut->setStyleSheet("QPushButton{border-image: url(:/res/button2.png);color: #FFFFFF;font: 10pt}");
+    moyBut->hide();
     connect(moyBut,SIGNAL(pressed()),this,SLOT(changemoy()));
 
     bosBut=new QPushButton(this);
-    bosBut->setGeometry(0,300,50,50);
-    bosBut->setText("Buy");
-    bosBut->show();
+    bosBut->setGeometry(1140,710,100,50);
+    bosBut->setStyleSheet("QPushButton{border-image: url(:/res/button2.png);color: #FFFFFF;font: 10pt}");
+    bosBut->setText("购买记录");
+    bosBut->hide();
     connect(bosBut,SIGNAL(pressed()),this,SLOT(changebos()));
+
+    infBut=new QPushButton(this);
+    infBut->setGeometry(1175,20,70,35);
+    infBut->setText("自然感染");
+    infBut->show();
+    connect(infBut,SIGNAL(pressed()),this,SLOT(changeinf()));
 
     for(int i=0;i<100;i++)
     {

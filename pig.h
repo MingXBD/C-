@@ -24,6 +24,8 @@ public:
     void beInfected();
     bool isDead();
     int getId();
+    static void setgid(int);
+    static int get_globalid();
 
     void debugout();
 

@@ -25,16 +25,17 @@ public:
     bool isfull();
     void setGrowRate(float);
     pig* getHead();
-    int getGrowRate();
+    float getGrowRate();
     bool isBlackOnly();
     bool isInfected();
+    int killinf();
     int getNumber();
     int getProtectLen();
     int getSize();
     bool isProtected(int);
 
     bool pigin(pig*);
-    void grow();
+    int grow();
     void beInfected(int);
     void updateInf();
     float sell(float[3],int);

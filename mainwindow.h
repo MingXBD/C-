@@ -68,6 +68,7 @@ public:
     QPushButton* pagenext;
     QPushButton* pagepre;
     QPushButton* statisticbut;
+    QPushButton* infBut;
     QPushButton* bosBut;
     QLabel* graphlabel[200];
     QLabel* shieldlabel[100];
@@ -87,6 +88,8 @@ public:
     void viewcreate();
     void updatenum();
     void statistic();
+
+    QString Strbignum(int);
 
     std::ofstream f_buy;
     std::ofstream f_sell;
@@ -111,6 +114,7 @@ public slots:
     void changepress();
     void changemoy();
     void changebos();
+    void changeinf();
 
     void gsave();
     void gload();

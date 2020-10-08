@@ -44,6 +44,16 @@ int pig::getId()
     return id;
 }
 
+void pig::setgid(int a)
+{
+    globalid=a;
+}
+
+int pig::get_globalid()
+{
+    return globalid;
+}
+
 void pig::debugout()
 {
     qDebug()<<"PigID: "<<id<<' '
