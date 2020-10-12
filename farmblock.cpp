@@ -213,6 +213,7 @@ void farmblock::updateInf()
             infected=1;
             return;
         }
+        tp=tp->next;
     }
 }
 
