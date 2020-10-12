@@ -205,8 +205,15 @@ void farmblock::updateInf()
             tp=tp->next;
         }
     }
-    if(number==0)
-        infected=0;
+    tp=head;
+    while(tp!=nullptr)
+    {
+        if(tp->isInfected())
+        {
+            infected=1;
+            return;
+        }
+    }
 }
 
 float farmblock::sell(float p[3],int time)
